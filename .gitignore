@@ -1,4 +1,5 @@
 node_modules
+artifacts
 abi
 cache
 yarn.lock
