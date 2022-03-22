@@ -7,21 +7,32 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 contract JaxBridge {
 
   uint chainId;
+  uint fee;
+  
   address public admin;
-  IERC20 public token;
-   mapping(address => mapping(uint => bool)) public processedNonces;
-  mapping(address => uint) public nonces;
+  address public verifier;
+  address public fee_wallet;
 
-  enum Step { Deposit, Withdraw }
-  event Transfer(
+  IERC20 public wjxn;
+  mapping(address => mapping(string => bool)) public processedTxs;
+
+  event Deposit(
     address from,
     address to,
     uint destChainId,
     uint amount,
     uint date,
-    uint nonce,
-    bytes signature,
-    Step indexed step
+    string txHash
+  );
+
+  event Withdraw(
+    address from,
+    address to,
+    uint destChainId,
+    uint amount,
+    uint date,
+    string txHash,
+    bytes signature
   );
 
   constructor() {
@@ -38,62 +49,59 @@ contract JaxBridge {
     _;
   }
 
-  function setToken(address _token) external onlyAdmin {
-    token = IERC20(_token);
+  function setToken(address _wjxn) external onlyAdmin {
+    wjxn = IERC20(_wjxn);
   }
 
   function deposit(uint amount) external onlyAdmin {
-    token.transferFrom(admin, address(this), amount);
+    wjxn.transferFrom(admin, address(this), amount);
   }
 
   function withdraw(uint amount) external onlyAdmin {
-    token.transfer(admin, amount);
+    wjxn.transfer(admin, amount);
   }
 
-  function deposit(address to, uint destChainId, uint amount, uint nonce, bytes calldata signature) external {
-    require(nonces[msg.sender] == nonce, 'transfer already processed');
-    nonces[msg.sender] += 1;
-    token.transferFrom(msg.sender, address(this), amount);
-    emit Transfer(
+  function deposit(address to, uint destChainId, uint amount, string calldata txHash) external {
+    wjxn.transferFrom(msg.sender, address(this), amount);
+    emit Deposit(
       msg.sender,
       to,
       destChainId,
       amount,
       block.timestamp,
-      nonce,
-      signature,
-      Step.Deposit
+      txHash
     );
   }
 
   function withdraw(
     address from, 
     address to, 
+    uint srcChainId,
     uint amount, 
-    uint nonce,
+    string calldata txHash,
     bytes calldata signature
-  ) external {
+  ) external onlyAdmin {
     bytes32 message = prefixed(keccak256(abi.encodePacked(
       from, 
       to, 
+      srcChainId,
       chainId,
       amount,
-      nonce
+      txHash
     )));
-    require(recoverSigner(message, signature) == from , 'wrong signature');
-    require(processedNonces[from][nonce] == false, 'transfer already processed');
-    processedNonces[from][nonce] = true;
-    require(token.balanceOf(address(this)) >= amount, 'insufficient pool');
-    token.transfer(to, amount);
-    emit Transfer(
+    require(recoverSigner(message, signature) == verifier , 'wrong signature');
+    require(processedTxs[from][txHash] == false, 'transfer already processed');
+    processedTxs[from][txHash] = true;
+    require(wjxn.balanceOf(address(this)) >= amount, 'insufficient pool');
+    wjxn.transfer(to, amount);
+    emit Withdraw(
       from,
       to,
       chainId,
       amount,
       block.timestamp,
-      nonce,
-      signature,
-      Step.Withdraw
+      txHash,
+      signature
     );
   }
 
