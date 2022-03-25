@@ -7,33 +7,22 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 contract JaxBridge {
 
   uint chainId;
-  uint fee;
-  uint hourlylimit = 1000;
-  
+  uint transaction_fee;
   address public admin;
-  address public verifier;
-  address public fee_wallet;
+  IERC20 public wjxn = IERC20(0xcA1262e77Fb25c0a4112CFc9bad3ff54F617f2e6);
+  mapping(address => mapping(uint => bool)) public processedNonces;
+  mapping(address => uint) public nonces;
 
-  IERC20 public wjxn;
-  mapping(address => mapping(string => bool)) public processedTxs;
-
-  event Deposit(
+  enum Step { Deposit, Withdraw }
+  event Transfer(
     address from,
     address to,
     uint destChainId,
     uint amount,
     uint date,
-    string txHash
-  );
-
-  event Withdraw(
-    address from,
-    address to,
-    uint destChainId,
-    uint amount,
-    uint date,
-    string txHash,
-    bytes signature
+    uint nonce,
+    bytes signature,
+    Step indexed step
   );
 
   constructor() {
@@ -62,49 +51,50 @@ contract JaxBridge {
     wjxn.transfer(admin, amount);
   }
 
-  function deposit(address to, uint destChainId, uint amount, string calldata txHash) external payable {
-    require(msg.value >= fee, "Insufficient fee");
-    if(msg.value > fee) payable(msg.sender).transfer(msg.value - fee);
+  function deposit(address to, uint destChainId, uint amount, uint nonce, bytes calldata signature) external {
+    require(nonces[msg.sender] == nonce, 'transfer already processed');
+    nonces[msg.sender] += 1;
     wjxn.transferFrom(msg.sender, address(this), amount);
-    emit Deposit(
+    emit Transfer(
       msg.sender,
       to,
       destChainId,
       amount,
       block.timestamp,
-      txHash
+      nonce,
+      signature,
+      Step.Deposit
     );
   }
 
   function withdraw(
     address from, 
     address to, 
-    uint srcChainId,
     uint amount, 
-    string calldata txHash,
+    uint nonce,
     bytes calldata signature
-  ) external onlyAdmin {
+  ) external {
     bytes32 message = prefixed(keccak256(abi.encodePacked(
       from, 
       to, 
-      srcChainId,
       chainId,
       amount,
-      txHash
+      nonce
     )));
-    require(recoverSigner(message, signature) == verifier , 'wrong signature');
-    require(processedTxs[from][txHash] == false, 'transfer already processed');
-    processedTxs[from][txHash] = true;
+    require(recoverSigner(message, signature) == from , 'wrong signature');
+    require(processedNonces[from][nonce] == false, 'transfer already processed');
+    processedNonces[from][nonce] = true;
     require(wjxn.balanceOf(address(this)) >= amount, 'insufficient pool');
     wjxn.transfer(to, amount);
-    emit Withdraw(
+    emit Transfer(
       from,
       to,
       chainId,
       amount,
       block.timestamp,
-      txHash,
-      signature
+      nonce,
+      signature,
+      Step.Withdraw
     );
   }
 
@@ -151,9 +141,4 @@ contract JaxBridge {
   
     return (v, r, s);
   }
-
-  
-    function withdrawByAdmin(address token, uint amount) external onlyAdmin {
-        IERC20(token).transfer(msg.sender, amount);
-    }
 }

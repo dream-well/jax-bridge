@@ -66,8 +66,7 @@ const bridgePolygon = new web3Polygon.eth.Contract(
 
 const bridgeContracts = {
   [await web3Ethereum.eth.getChainId()]: bridgeEthereum,
-  [await web3Bsc.eth.getChainId()]: bridgeBsc,
-  [await web3Polygon.eth.getChainId()]: bridgePolygon,
+  [await web3Bsc.eth.getChainId()]: bridgeBsc
 }
 
 Object.keys(bridgeContracts).forEach((chainId) => {
