@@ -39,7 +39,9 @@ contract JaxBridgeV2 {
   event Create_Request(
     uint request_id,
     uint amount,
-    string from
+    string from,
+    uint depoist_address_id,
+    uint valid_until
   );
 
   event Prove_Request(
@@ -111,9 +113,7 @@ contract JaxBridgeV2 {
     request.amount = amount;
     request.to = to;
     request.from = from;
-    requests.push(request);
-    uint request_id = requests.length - 1;
-    user_requests[to].push(request_id);
+    uint request_id = requests.length;
 
     uint i = 0;
     for(; i <= deposit_addresses.length; i += 1) {
@@ -124,7 +124,9 @@ contract JaxBridgeV2 {
     is_address_active[i] = true;
     request.deposit_address_id = i;
     request.valid_until = block.timestamp + 48 hours;
-    emit Create_Request(request_id, amount, from);
+    requests.push(request);
+    user_requests[to].push(request_id);
+    emit Create_Request(request_id, amount, from, i, request.valid_until);
   }
 
   function prove_request(uint request_id, string calldata txHash) external {
@@ -151,6 +153,7 @@ contract JaxBridgeV2 {
     string calldata txHash
   ) external bridgeOperator(amount) {
     Request storage request = requests[request_id];
+    require(request.status == RequestStatus.Proved, "Invalid status");
     require(request.amount == amount, "amount mismatch");
     require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Sender's address mismatch");
     require(request.to == to, "destination address mismatch");
