@@ -27,7 +27,7 @@ contract JaxBridgeV2 {
   }
 
   string[] public deposit_addresses;
-  bool[] public is_address_active;
+  uint[] public deposit_address_locktimes;
 
   Request[] public requests;
 
@@ -69,6 +69,10 @@ contract JaxBridgeV2 {
     uint operating_limit
   );
 
+  event Free_Deposit_Address(
+    uint deposit_address_id
+  );
+
   constructor() {
     admin = msg.sender;
     uint _chainId;
@@ -103,7 +107,7 @@ contract JaxBridgeV2 {
   function add_deposit_addresses(string[] calldata new_addresses) external {
     for(uint i = 0; i < new_addresses.length; i += 1) {
       deposit_addresses.push(new_addresses[i]);
-      is_address_active.push(false);
+      deposit_address_locktimes.push(0);
     }
   }
 
@@ -117,22 +121,24 @@ contract JaxBridgeV2 {
 
     uint i = 0;
     for(; i <= deposit_addresses.length; i += 1) {
-      if(!is_address_active[i])
+      if(deposit_address_locktimes[i] == 0)
         break;
     }
     require(i < deposit_addresses.length, "All deposit addresses are active");
-    is_address_active[i] = true;
     request.deposit_address_id = i;
-    request.valid_until = block.timestamp + 48 hours;
+    uint valid_until = block.timestamp + 48 hours;
+    request.valid_until = valid_until;
+    deposit_address_locktimes[i] = valid_until;
     requests.push(request);
     user_requests[to].push(request_id);
-    emit Create_Request(request_id, amount, from, i, request.valid_until);
+    emit Create_Request(request_id, amount, from, i, valid_until);
   }
 
   function prove_request(uint request_id, string calldata txHash) external {
     Request storage request = requests[request_id];
     require(request.to == msg.sender, "Invalid account");
     require(request.status == RequestStatus.Init, "Invalid status");
+    require(request.valid_until >= block.timestamp, "Expired");
     request.txHash = txHash;
     request.status = RequestStatus.Proved;
     emit Prove_Request(request_id);
@@ -159,7 +165,7 @@ contract JaxBridgeV2 {
     require(request.to == to, "destination address mismatch");
     require(keccak256(abi.encodePacked(request.txHash)) == keccak256(abi.encodePacked(txHash)), "Tx Hash mismatch");
     request.txHash = txHash;
-    is_address_active[request.deposit_address_id] = false;
+    deposit_address_locktimes[request.deposit_address_id] = 0;
     request.status = RequestStatus.Released;
     wjxn.transfer(request.to, request.amount - fee);
     emit Release(request_id, request.to, request.amount - fee);
@@ -200,5 +206,14 @@ contract JaxBridgeV2 {
   function set_fee(uint _fee) external onlyAdmin {
     fee = _fee;
     emit Set_Fee(fee);
+  }
+
+  function free_deposit_addresses() external onlyAdmin  {
+    for(uint i = 0; i < deposit_address_locktimes.length; i += 1) {
+      if(deposit_address_locktimes[i] < block.timestamp) {
+        deposit_address_locktimes[i] = 0;
+        emit Free_Deposit_Address(i);
+      }
+    }
   }
 }
