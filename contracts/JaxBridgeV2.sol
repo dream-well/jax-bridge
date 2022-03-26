@@ -109,6 +109,7 @@ contract JaxBridgeV2 {
 
   function prove_request(uint request_id, string calldata txHash) external {
     Request storage request = requests[request_id];
+    require(request.to == msg.sender, "Invalid account");
     require(request.status == RequestStatus.Init, "Invalid status");
     request.txHash = txHash;
     request.status = RequestStatus.Proved;
