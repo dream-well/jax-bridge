@@ -56,6 +56,17 @@ contract JaxBridgeV2 {
     uint amount
   );
 
+
+  event Set_Fee(
+    uint fee
+  );
+
+
+  event Set_Operating_Limit(
+    address operator,
+    uint operating_limit
+  );
+
   constructor() {
     admin = msg.sender;
     uint _chainId;
@@ -69,6 +80,15 @@ contract JaxBridgeV2 {
     require(admin == msg.sender, "Only Admin can perform this operation.");
     _;
   }
+
+
+  modifier bridgeOperator(uint amount) {
+    require(isBridgeOperator(msg.sender), "Not a bridge operator");
+    require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
+    _;
+    operating_limits[msg.sender] -= amount;
+  }
+
 
   function deposit(uint amount) external onlyAdmin {
     wjxn.transferFrom(admin, address(this), amount);
@@ -168,15 +188,14 @@ contract JaxBridgeV2 {
     return false;
   }
 
-  modifier bridgeOperator(uint amount) {
-    require(isBridgeOperator(msg.sender), "Not a bridge operator");
-    require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
-    _;
-    operating_limits[msg.sender] -= amount;
-  }
-
   function set_operating_limit(address operator, uint operating_limit) external onlyAdmin {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
     operating_limits[operator] = operating_limit;
+    emit Set_Operating_Limit(operator, operating_limit);
+  }
+
+  function set_fee(uint _fee) external onlyAdmin {
+    fee = _fee;
+    emit Set_Fee(fee);
   }
 }
