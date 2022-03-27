@@ -97,7 +97,7 @@ contract JaxBridgeV2 {
     wjxn.transfer(admin, amount);
   }
 
-  function add_deposit_addresses(string[] calldata new_addresses) external {
+  function add_deposit_addresses(string[] calldata new_addresses) external onlyAdmin {
     for(uint i = 0; i < new_addresses.length; i += 1) {
       deposit_addresses.push(new_addresses[i]);
       deposit_address_locktimes.push(0);
@@ -114,12 +114,12 @@ contract JaxBridgeV2 {
   function create_request(uint request_id, bytes32 amount_hash, uint deposit_address_id, address to, string calldata from) external 
     isValidDepositAddress(deposit_address_id)
   {
+    require(to == msg.sender, "destination address should be sender");
     require(request_id == requests.length, "Invalid request id");
     Request memory request;
     request.amount_hash = amount_hash;
     request.to = to;
     request.from = from;
-
     require(deposit_address_locktimes.length > deposit_address_id, "deposit_address_id out of index");
     require(deposit_address_locktimes[deposit_address_id] == 0, "Deposit address is in use");
     request.deposit_address_id = deposit_address_id;
@@ -263,12 +263,12 @@ contract JaxBridgeV2 {
     return deposit_addresses;
   }
   
-  function add_penalty_amount(uint amount, bytes32 info_hash) external {
+  function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAdmin {
     penalty_amount += amount;
     emit Add_Penalty_Amount(amount, info_hash);
   }
 
-  function subtract_penalty_amount(uint amount, bytes32 info_hash) external {
+  function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAdmin {
     require(penalty_amount >= amount, "over penalty amount");
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
