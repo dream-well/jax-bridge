@@ -88,7 +88,8 @@ contract JaxBridgeV2 {
   }
 
 
-  modifier bridgeOperator(uint amount) {
+  modifier bridgeOperator(uint request_id) {
+    uint amount = requests[request_id].amount;
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
     _;
@@ -153,14 +154,14 @@ contract JaxBridgeV2 {
 
   function release(
     uint request_id,
-    uint amount,
+    bytes32 txdHash,
     string calldata from,
     address to,
     string calldata txHash
-  ) external bridgeOperator(amount) {
+  ) external bridgeOperator(request_id) {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Proved, "Invalid status");
-    require(request.amount == amount, "amount mismatch");
+    require(txdHash == keccak256(abi.encodePacked(request_id, request.amount)), "Invalid txdhash");
     require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Sender's address mismatch");
     require(request.to == to, "destination address mismatch");
     require(keccak256(abi.encodePacked(request.txHash)) == keccak256(abi.encodePacked(txHash)), "Tx Hash mismatch");
