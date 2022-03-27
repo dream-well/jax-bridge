@@ -39,7 +39,6 @@ contract JaxBridgeV2 {
   uint[] public deposit_address_locktimes;
   mapping(uint => bool) public deposit_address_deleted;
   mapping(uint => uint) public deposit_address_requests;
-  mapping(bytes32 => uint) public amount_hash_requests;
 
   Request[] public requests;
 
@@ -125,7 +124,6 @@ contract JaxBridgeV2 {
     require(deposit_address_locktimes[deposit_address_id] == 0, "Deposit address is in use");
     request.deposit_address_id = deposit_address_id;
     deposit_address_requests[deposit_address_id] = request_id;
-    amount_hash_requests[amount_hash] = request_id;
     uint valid_until = block.timestamp + 48 hours;
     request.valid_until = valid_until;
     deposit_address_locktimes[deposit_address_id] = valid_until;
@@ -174,7 +172,6 @@ contract JaxBridgeV2 {
     require(request.amount_hash == keccak256(abi.encodePacked(request_id, amount)), "Incorrect amount");
     require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Sender's address mismatch");
     require(request.to == to, "destination address mismatch");
-    require(keccak256(abi.encodePacked(request.txHash)) == keccak256(abi.encodePacked(txHash)), "Tx Hash mismatch");
     request.txHash = txHash;
     deposit_address_locktimes[request.deposit_address_id] = 0;
     request.amount = amount;
@@ -186,10 +183,12 @@ contract JaxBridgeV2 {
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
         wjxn.transfer(penalty_wallet, fee_amount);
+        penalty_amount -= fee_amount;
       }
       else {
         wjxn.transfer(penalty_wallet, penalty_amount);
         wjxn.transfer(msg.sender, fee_amount - penalty_amount);
+        penalty_amount -= penalty_amount;
       }
     }
     else {
