@@ -38,6 +38,8 @@ contract JaxBridgeV2 {
   string[] public deposit_addresses;
   uint[] public deposit_address_locktimes;
   mapping(uint => bool) public deposit_address_deleted;
+  mapping(uint => uint) public deposit_address_requests;
+  mapping(bytes32 => uint) public amount_hash_requests;
 
   Request[] public requests;
 
@@ -50,6 +52,7 @@ contract JaxBridgeV2 {
 
   event Create_Request(uint request_id, bytes32 amount_hash, string from, uint depoist_address_id, uint valid_until);
   event Prove_Request(uint request_id);
+  event Expire_Request(uint request_id);
   event Reject_Request(uint request_id);
   event Release(uint request_id, address from, uint amount);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
@@ -121,6 +124,8 @@ contract JaxBridgeV2 {
     require(deposit_address_locktimes.length > deposit_address_id, "deposit_address_id out of index");
     require(deposit_address_locktimes[deposit_address_id] == 0, "Deposit address is in use");
     request.deposit_address_id = deposit_address_id;
+    deposit_address_requests[deposit_address_id] = request_id;
+    amount_hash_requests[amount_hash] = request_id;
     uint valid_until = block.timestamp + 48 hours;
     request.valid_until = valid_until;
     deposit_address_locktimes[deposit_address_id] = valid_until;
@@ -133,6 +138,12 @@ contract JaxBridgeV2 {
     Request storage request = requests[request_id];
     require(request.to == msg.sender, "Invalid account");
     require(request.status == RequestStatus.Init, "Invalid status");
+    if(request.valid_until >= block.timestamp) {
+      request.status = RequestStatus.Expired;
+      request.prove_timestamp = block.timestamp;
+      emit Expire_Request(request_id);
+      return;
+    }
     require(request.valid_until >= block.timestamp, "Expired");
     require(proccessed_txd_hashes[txdHash] == false, "Invalid txd hash");
     request.txdHash = txdHash;
@@ -227,10 +238,15 @@ contract JaxBridgeV2 {
   }
 
   function free_deposit_addresses(uint from, uint to) external onlyAdmin  {
+    uint request_id;
     for(uint i = from; i < deposit_address_locktimes.length && i <= to ; i += 1) {
       if(deposit_address_locktimes[i] < block.timestamp) {
-        deposit_address_locktimes[i] = 0;
-        emit Free_Deposit_Address(i);
+        request_id = deposit_address_requests[i];
+        if(requests[request_id].status == RequestStatus.Init){
+          requests[request_id].status = RequestStatus.Expired;
+          deposit_address_locktimes[i] = 0;
+          emit Free_Deposit_Address(i);
+        }
       }
     }
   }
