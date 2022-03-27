@@ -80,6 +80,10 @@ contract JaxBridgeV2 {
     address wallet
   );
 
+  event Set_Admin(
+    address admin
+  );
+
   constructor() {
     admin = msg.sender;
     uint _chainId;
@@ -229,5 +233,10 @@ contract JaxBridgeV2 {
   function set_fee_wallet(address _fee_wallet) external onlyAdmin {
     fee_wallet = _fee_wallet;
     emit Set_Fee_Wallet(_fee_wallet);
+  }
+
+  function set_admin(address _admin) external onlyAdmin {
+    admin = _admin;
+    emit Set_Admin(_admint);
   }
 }
