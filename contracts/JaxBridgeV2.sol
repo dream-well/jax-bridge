@@ -123,6 +123,8 @@ contract JaxBridgeV2 {
     }
   }
 
+  
+
   function create_request(uint request_id, bytes32 amount_hash, address to, string calldata from) external {
     require(request_id == requests.length, "Invalid request id");
     Request memory request;
@@ -157,7 +159,7 @@ contract JaxBridgeV2 {
 
   function reject_request(uint request_id) external onlyAdmin {
     Request storage request = requests[request_id];
-    // require(request.status == RequestStatus.Init, "Invalid status");
+    require(request.status == RequestStatus.Init || request.status == RequestStatus.Proved, "Invalid status");
     request.status = RequestStatus.Rejected;
     emit Reject_Request(request_id);
   }
