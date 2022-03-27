@@ -111,12 +111,15 @@ contract JaxBridgeV2 {
     revert("All deposit addresses are in use");
   }
 
-  function create_request(uint request_id, bytes32 amount_hash, uint deposit_address_id, address to, string calldata from) external 
+  function create_request(uint request_id, uint amount, bytes32 amount_hash, uint deposit_address_id, address to, string calldata from) external 
     isValidDepositAddress(deposit_address_id)
   {
     require(to == msg.sender, "destination address should be sender");
     require(request_id == requests.length, "Invalid request id");
+    require(amount_hash == keccak256(abi.encodePacked(request_id, amount)), "Incorrect amount hash");
+    require(amount > minimum_fee_amount, "Below minimum amount");
     Request memory request;
+    request.amount = amount;
     request.amount_hash = amount_hash;
     request.to = to;
     request.from = from;
@@ -147,6 +150,7 @@ contract JaxBridgeV2 {
     request.txdHash = txdHash;
     request.status = RequestStatus.Proved;
     request.prove_timestamp = block.timestamp;
+    request.amount = 0;
     emit Prove_Request(request_id);
   }
 
