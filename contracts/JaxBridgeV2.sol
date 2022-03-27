@@ -138,12 +138,14 @@ contract JaxBridgeV2 {
 
   function get_free_deposit_address_id() external view returns(uint) {
     for(uint i = 0; i < deposit_address_locktimes.length; i += 1) {
-      if(deposit_address_locktimes[i] == 0) return i;
+      if(deposit_address_deleted[i] == false && deposit_address_locktimes[i] == 0) return i;
     }
     revert("All deposit addresses are in use");
   }
 
-  function create_request(uint request_id, bytes32 amount_hash, uint deposit_address_id, address to, string calldata from) external {
+  function create_request(uint request_id, bytes32 amount_hash, uint deposit_address_id, address to, string calldata from) external 
+    isValidDepositAddress(deposit_address_id)
+  {
     require(request_id == requests.length, "Invalid request id");
     Request memory request;
     request.amount_hash = amount_hash;
@@ -242,8 +244,8 @@ contract JaxBridgeV2 {
     emit Set_Fee(fee);
   }
 
-  function free_deposit_addresses() external onlyAdmin  {
-    for(uint i = 0; i < deposit_address_locktimes.length; i += 1) {
+  function free_deposit_addresses(uint from, uint to) external onlyAdmin  {
+    for(uint i = from; i < deposit_address_locktimes.length && i <= to ; i += 1) {
       if(deposit_address_locktimes[i] < block.timestamp) {
         deposit_address_locktimes[i] = 0;
         emit Free_Deposit_Address(i);
@@ -255,6 +257,7 @@ contract JaxBridgeV2 {
     uint id;
     for(uint i = 0; i < ids.length; i += 1) {
       id = ids[i];
+      require(deposit_address_locktimes[i] == 0, "Active deposit address");
       deposit_address_deleted[id] = true;
     }
     emit Delete_Deposit_Addresses(ids);
@@ -272,5 +275,9 @@ contract JaxBridgeV2 {
 
   function get_new_request_id() external view returns(uint) {
     return requests.length;
+  }
+
+  function get_deposit_addresses() external view returns(string[] memory) {
+    return deposit_addresses;
   }
 }
