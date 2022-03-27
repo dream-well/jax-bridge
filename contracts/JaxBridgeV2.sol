@@ -8,7 +8,7 @@ contract JaxBridgeV2 {
 
   uint chainId;
   
-  uint fee = 50;
+  uint public fee = 50;
 
   address public admin;
 
