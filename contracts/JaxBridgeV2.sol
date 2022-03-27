@@ -17,9 +17,10 @@ contract JaxBridgeV2 {
   enum RequestStatus {Init, Proved, Rejected, Expired, Released}
 
   struct Request {
-    uint amount;
     uint deposit_address_id;
     uint valid_until;
+    uint amount;
+    bytes32 amount_hash;
     address to;
     RequestStatus status;
     string from;
@@ -38,7 +39,7 @@ contract JaxBridgeV2 {
 
   event Create_Request(
     uint request_id,
-    uint amount,
+    bytes32 amount_hash,
     string from,
     uint depoist_address_id,
     uint valid_until
@@ -88,8 +89,7 @@ contract JaxBridgeV2 {
   }
 
 
-  modifier bridgeOperator(uint request_id) {
-    uint amount = requests[request_id].amount;
+  modifier bridgeOperator(uint amount) {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
     _;
@@ -112,13 +112,12 @@ contract JaxBridgeV2 {
     }
   }
 
-  function create_request(uint amount, address to, string calldata from) external {
-    require(amount >= 100, "Min amount 100");
+  function create_request(uint request_id, bytes32 amount_hash, address to, string calldata from) external {
+    require(request_id == requests.length, "Invalid request id");
     Request memory request;
-    request.amount = amount;
+    request.amount_hash = amount_hash;
     request.to = to;
     request.from = from;
-    uint request_id = requests.length;
 
     uint i = 0;
     for(; i <= deposit_addresses.length; i += 1) {
@@ -132,7 +131,7 @@ contract JaxBridgeV2 {
     deposit_address_locktimes[i] = valid_until;
     requests.push(request);
     user_requests[to].push(request_id);
-    emit Create_Request(request_id, amount, from, i, valid_until);
+    emit Create_Request(request_id, amount_hash, from, i, valid_until);
   }
 
   function prove_request(uint request_id, string calldata txHash) external {
@@ -154,19 +153,20 @@ contract JaxBridgeV2 {
 
   function release(
     uint request_id,
-    bytes32 txdHash,
+    uint amount,
     string calldata from,
     address to,
     string calldata txHash
-  ) external bridgeOperator(request_id) {
+  ) external bridgeOperator(amount) {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Proved, "Invalid status");
-    require(txdHash == keccak256(abi.encodePacked(request_id, request.amount)), "Invalid txdhash");
+    require(request.amount_hash == keccak256(abi.encodePacked(request_id, amount)), "Incorrect amount");
     require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Sender's address mismatch");
     require(request.to == to, "destination address mismatch");
     require(keccak256(abi.encodePacked(request.txHash)) == keccak256(abi.encodePacked(txHash)), "Tx Hash mismatch");
     request.txHash = txHash;
     deposit_address_locktimes[request.deposit_address_id] = 0;
+    request.amount = amount;
     request.status = RequestStatus.Released;
     wjxn.transfer(request.to, request.amount - fee);
     emit Release(request_id, request.to, request.amount - fee);
