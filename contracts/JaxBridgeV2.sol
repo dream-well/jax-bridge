@@ -23,6 +23,7 @@ contract JaxBridgeV2 {
     uint valid_until;
     uint amount;
     bytes32 amount_hash;
+    bytes32 txdHash;
     address to;
     RequestStatus status;
     string from;
@@ -38,6 +39,8 @@ contract JaxBridgeV2 {
 
   address[] public bridge_operators;
   mapping(address => uint) operating_limits;
+
+  mapping(bytes32 => bool) proccessed_txd_hashes;
 
   event Create_Request(
     uint request_id,
@@ -123,36 +126,38 @@ contract JaxBridgeV2 {
     }
   }
 
-  
+  function get_free_deposit_address_id() external view returns(uint) {
+    for(uint i = 0; i < deposit_address_locktimes.length; i += 1) {
+      if(deposit_address_locktimes[i] == 0) return i;
+    }
+    revert("All deposit addresses are in use");
+  }
 
-  function create_request(uint request_id, bytes32 amount_hash, address to, string calldata from) external {
+  function create_request(uint request_id, bytes32 amount_hash, uint deposit_address_id, address to, string calldata from) external {
     require(request_id == requests.length, "Invalid request id");
     Request memory request;
     request.amount_hash = amount_hash;
     request.to = to;
     request.from = from;
 
-    uint i = 0;
-    for(; i <= deposit_addresses.length; i += 1) {
-      if(deposit_address_locktimes[i] == 0)
-        break;
-    }
-    require(i < deposit_addresses.length, "All deposit addresses are active");
-    request.deposit_address_id = i;
+    require(deposit_address_locktimes.length > deposit_address_id, "deposit_address_id out of index");
+    require(deposit_address_locktimes[deposit_address_id] == 0, "Deposit address is in use");
+    request.deposit_address_id = deposit_address_id;
     uint valid_until = block.timestamp + 48 hours;
     request.valid_until = valid_until;
-    deposit_address_locktimes[i] = valid_until;
+    deposit_address_locktimes[deposit_address_id] = valid_until;
     requests.push(request);
     user_requests[to].push(request_id);
-    emit Create_Request(request_id, amount_hash, from, i, valid_until);
+    emit Create_Request(request_id, amount_hash, from, deposit_address_id, valid_until);
   }
 
-  function prove_request(uint request_id, string calldata txHash) external {
+  function prove_request(uint request_id, bytes32 txdHash) external {
     Request storage request = requests[request_id];
     require(request.to == msg.sender, "Invalid account");
     require(request.status == RequestStatus.Init, "Invalid status");
     require(request.valid_until >= block.timestamp, "Expired");
-    request.txHash = txHash;
+    require(proccessed_txd_hashes[txdHash] == false, "Invalid txd hash");
+    request.txdHash = txdHash;
     request.status = RequestStatus.Proved;
     emit Prove_Request(request_id);
   }
@@ -173,6 +178,8 @@ contract JaxBridgeV2 {
   ) external bridgeOperator(amount) {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Proved, "Invalid status");
+    require(request.txdHash == keccak256(abi.encodePacked(txHash)), "Invalid txHash");
+    require(proccessed_txd_hashes[request.txdHash] == false, "Txd hash already processed");
     require(request.amount_hash == keccak256(abi.encodePacked(request_id, amount)), "Incorrect amount");
     require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Sender's address mismatch");
     require(request.to == to, "destination address mismatch");
@@ -181,6 +188,7 @@ contract JaxBridgeV2 {
     deposit_address_locktimes[request.deposit_address_id] = 0;
     request.amount = amount;
     request.status = RequestStatus.Released;
+    proccessed_txd_hashes[request.txdHash] = true;
     wjxn.transfer(request.to, request.amount - fee);
     wjxn.transfer(fee_wallet, fee);
     emit Release(request_id, request.to, request.amount - fee);
@@ -213,7 +221,7 @@ contract JaxBridgeV2 {
   }
 
   function set_operating_limit(address operator, uint operating_limit) external onlyAdmin {
-    require(isBridgeOperator(msg.sender), "Not a bridge operator");
+    require(isBridgeOperator(operator), "Not a bridge operator");
     operating_limits[operator] = operating_limit;
     emit Set_Operating_Limit(operator, operating_limit);
   }
