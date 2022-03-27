@@ -237,6 +237,6 @@ contract JaxBridgeV2 {
 
   function set_admin(address _admin) external onlyAdmin {
     admin = _admin;
-    emit Set_Admin(_admint);
+    emit Set_Admin(_admin);
   }
 }
