@@ -77,11 +77,9 @@ contract JaxBridgeV2 {
   }
 
 
-  modifier bridgeOperator(uint amount) {
+  modifier onlyOperator() {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
-    require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
     _;
-    operating_limits[msg.sender] -= amount;
   }
 
   modifier isValidDepositAddress(uint deposit_address_id) {
@@ -143,7 +141,7 @@ contract JaxBridgeV2 {
     emit Prove_Request(request_id);
   }
 
-  function reject_request(uint request_id) external onlyAdmin {
+  function reject_request(uint request_id) external onlyOperator {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Init || request.status == RequestStatus.Proved, "Invalid status");
     request.status = RequestStatus.Rejected;
@@ -156,8 +154,9 @@ contract JaxBridgeV2 {
     string calldata from,
     address to,
     string calldata txHash
-  ) external bridgeOperator(amount) {
+  ) external onlyOperator {
     Request storage request = requests[request_id];
+    require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
     require(request.status == RequestStatus.Proved, "Invalid status");
     require(request.txdHash == keccak256(abi.encodePacked(txHash)), "Invalid txHash");
     require(proccessed_txd_hashes[request.txdHash] == false, "Txd hash already processed");
@@ -185,6 +184,7 @@ contract JaxBridgeV2 {
     else {
       wjxn.transfer(msg.sender, fee_amount);
     }
+    operating_limits[msg.sender] -= amount;
     emit Release(request_id, request.to, request.amount - fee_amount);
   }
 
