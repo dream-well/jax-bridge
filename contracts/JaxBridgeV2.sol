@@ -12,6 +12,8 @@ contract JaxBridgeV2 {
 
   address public admin;
 
+  address public fee_wallet;
+
   IERC20 public wjxn = IERC20(0xA25946ec9D37dD826BbE0cbDbb2d79E69834e41e);
 
   enum RequestStatus {Init, Proved, Rejected, Expired, Released}
@@ -74,6 +76,10 @@ contract JaxBridgeV2 {
     uint deposit_address_id
   );
 
+  event Set_Fee_Wallet(
+    address wallet
+  );
+
   constructor() {
     admin = msg.sender;
     uint _chainId;
@@ -81,6 +87,7 @@ contract JaxBridgeV2 {
         _chainId := chainid()
     }
     chainId = _chainId;
+    fee_wallet = msg.sender;
   }
 
   modifier onlyAdmin() {
@@ -169,6 +176,7 @@ contract JaxBridgeV2 {
     request.amount = amount;
     request.status = RequestStatus.Released;
     wjxn.transfer(request.to, request.amount - fee);
+    wjxn.transfer(fee_wallet, fee);
     emit Release(request_id, request.to, request.amount - fee);
   }
 
@@ -216,5 +224,10 @@ contract JaxBridgeV2 {
         emit Free_Deposit_Address(i);
       }
     }
+  }
+
+  function set_fee_wallet(address _fee_wallet) external onlyAdmin {
+    fee_wallet = _fee_wallet;
+    emit Set_Fee_Wallet(_fee_wallet);
   }
 }
