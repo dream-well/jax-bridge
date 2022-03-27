@@ -8,13 +8,17 @@ contract JaxBridgeV2 {
 
   uint chainId;
   
-  uint public fee = 50;
+  uint public fee_percent = 5e5; // 0.5 %
+  uint public minimum_fee_amount = 50; // 50 WJXN
 
   address public admin;
 
-  address public fee_wallet;
+  uint public penalty_amount = 0;
+
+  address public penalty_wallet;
 
   IERC20 public wjxn = IERC20(0xA25946ec9D37dD826BbE0cbDbb2d79E69834e41e);
+
 
   enum RequestStatus {Init, Proved, Rejected, Expired, Released}
 
@@ -44,54 +48,18 @@ contract JaxBridgeV2 {
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
 
-  event Create_Request(
-    uint request_id,
-    bytes32 amount_hash,
-    string from,
-    uint depoist_address_id,
-    uint valid_until
-  );
-
-  event Prove_Request(
-    uint request_id
-  );
-
-  event Reject_Request(
-    uint request_id
-  );
-
-  event Release(
-    uint request_id,
-    address from,
-    uint amount
-  );
-
-
-  event Set_Fee(
-    uint fee
-  );
-
-
-  event Set_Operating_Limit(
-    address operator,
-    uint operating_limit
-  );
-
-  event Free_Deposit_Address(
-    uint deposit_address_id
-  );
-
-  event Set_Fee_Wallet(
-    address wallet
-  );
-
-  event Set_Admin(
-    address admin
-  );
-
-  event Delete_Deposit_Addresses(
-    uint[] ids
-  );
+  event Create_Request(uint request_id, bytes32 amount_hash, string from, uint depoist_address_id, uint valid_until);
+  event Prove_Request(uint request_id);
+  event Reject_Request(uint request_id);
+  event Release(uint request_id, address from, uint amount);
+  event Set_Fee(uint fee_percent, uint minimum_fee_amount);
+  event Set_Operating_Limit(address operator, uint operating_limit);
+  event Free_Deposit_Address(uint deposit_address_id);
+  event Set_Penalty_Wallet(address wallet);
+  event Set_Admin(address admin);
+  event Delete_Deposit_Addresses(uint[] ids);
+  event Add_Penalty_Amount(uint amount, bytes32 info_hash);
+  event Subtract_Penalty_Amount(uint amount, bytes32 info_hash);
 
   constructor() {
     admin = msg.sender;
@@ -100,7 +68,7 @@ contract JaxBridgeV2 {
         _chainId := chainid()
     }
     chainId = _chainId;
-    fee_wallet = msg.sender;
+    penalty_wallet = msg.sender;
   }
 
   modifier onlyAdmin() {
@@ -202,9 +170,22 @@ contract JaxBridgeV2 {
     request.amount = amount;
     request.status = RequestStatus.Released;
     proccessed_txd_hashes[request.txdHash] = true;
-    wjxn.transfer(request.to, request.amount - fee);
-    wjxn.transfer(fee_wallet, fee);
-    emit Release(request_id, request.to, request.amount - fee);
+    uint fee_amount = request.amount * fee_percent / 1e8;
+    if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
+    wjxn.transfer(request.to, request.amount - fee_amount);
+    if(penalty_amount > 0) {
+      if(penalty_amount > fee_amount) {
+        wjxn.transfer(penalty_wallet, fee_amount);
+      }
+      else {
+        wjxn.transfer(penalty_wallet, penalty_amount);
+        wjxn.transfer(msg.sender, fee_amount - penalty_amount);
+      }
+    }
+    else {
+      wjxn.transfer(msg.sender, fee_amount);
+    }
+    emit Release(request_id, request.to, request.amount - fee_amount);
   }
 
   function get_user_requests(address user) external view returns(uint[] memory) {
@@ -239,9 +220,10 @@ contract JaxBridgeV2 {
     emit Set_Operating_Limit(operator, operating_limit);
   }
 
-  function set_fee(uint _fee) external onlyAdmin {
-    fee = _fee;
-    emit Set_Fee(fee);
+  function set_fee(uint _fee_percent, uint _minimum_fee_amount) external onlyAdmin {
+    fee_percent = _fee_percent;
+    minimum_fee_amount = _minimum_fee_amount;
+    emit Set_Fee(_fee_percent, _minimum_fee_amount);
   }
 
   function free_deposit_addresses(uint from, uint to) external onlyAdmin  {
@@ -263,9 +245,9 @@ contract JaxBridgeV2 {
     emit Delete_Deposit_Addresses(ids);
   }
 
-  function set_fee_wallet(address _fee_wallet) external onlyAdmin {
-    fee_wallet = _fee_wallet;
-    emit Set_Fee_Wallet(_fee_wallet);
+  function set_penalty_wallet(address _penalty_wallet) external onlyAdmin {
+    penalty_wallet = _penalty_wallet;
+    emit Set_Penalty_Wallet(_penalty_wallet);
   }
 
   function set_admin(address _admin) external onlyAdmin {
@@ -279,5 +261,15 @@ contract JaxBridgeV2 {
 
   function get_deposit_addresses() external view returns(string[] memory) {
     return deposit_addresses;
+  }
+  
+  function add_penalty_amount(uint amount, bytes32 info_hash) external {
+    penalty_amount += amount;
+    emit Add_Penalty_Amount(amount, info_hash);
+  }
+
+  function subtract_penalty_amount(uint amount, bytes32 info_hash) external {
+    require(penalty_amount >= amount, "over penalty amount");
+    emit Subtract_Penalty_Amount(amount, info_hash);
   }
 }
