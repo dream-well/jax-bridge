@@ -111,16 +111,15 @@ contract JaxBridgeV2 {
     revert("All deposit addresses are in use");
   }
 
-  function create_request(uint request_id, uint amount, bytes32 amount_hash, uint deposit_address_id, address to, string calldata from) external 
+  function create_request(uint request_id, uint amount, uint deposit_address_id, address to, string calldata from) external 
     isValidDepositAddress(deposit_address_id)
   {
     require(to == msg.sender, "destination address should be sender");
     require(request_id == requests.length, "Invalid request id");
-    require(amount_hash == keccak256(abi.encodePacked(request_id, amount)), "Incorrect amount hash");
     require(amount > minimum_fee_amount, "Below minimum amount");
     Request memory request;
     request.amount = amount;
-    request.amount_hash = amount_hash;
+    request.amount_hash = keccak256(abi.encodePacked(request_id, amount));
     request.to = to;
     request.from = from;
     require(deposit_address_locktimes.length > deposit_address_id, "deposit_address_id out of index");
