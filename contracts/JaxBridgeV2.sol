@@ -20,10 +20,11 @@ contract JaxBridgeV2 {
 
   struct Request {
     uint deposit_address_id;
-    uint valid_until;
     uint amount;
     bytes32 amount_hash;
     bytes32 txdHash;
+    uint valid_until;
+    uint prove_timestamp;
     address to;
     RequestStatus status;
     string from;
@@ -32,6 +33,7 @@ contract JaxBridgeV2 {
 
   string[] public deposit_addresses;
   uint[] public deposit_address_locktimes;
+  mapping(uint => bool) public deposit_address_deleted;
 
   Request[] public requests;
 
@@ -87,6 +89,10 @@ contract JaxBridgeV2 {
     address admin
   );
 
+  event Delete_Deposit_Addresses(
+    uint[] ids
+  );
+
   constructor() {
     admin = msg.sender;
     uint _chainId;
@@ -110,6 +116,10 @@ contract JaxBridgeV2 {
     operating_limits[msg.sender] -= amount;
   }
 
+  modifier isValidDepositAddress(uint deposit_address_id) {
+    require(deposit_address_deleted[deposit_address_id] == false, "Deposit address deleted");
+    _;
+  }
 
   function deposit(uint amount) external onlyAdmin {
     wjxn.transferFrom(admin, address(this), amount);
@@ -159,6 +169,7 @@ contract JaxBridgeV2 {
     require(proccessed_txd_hashes[txdHash] == false, "Invalid txd hash");
     request.txdHash = txdHash;
     request.status = RequestStatus.Proved;
+    request.prove_timestamp = block.timestamp;
     emit Prove_Request(request_id);
   }
 
@@ -240,6 +251,15 @@ contract JaxBridgeV2 {
     }
   }
 
+  function delete_deposit_addresses(uint[] calldata ids) external onlyAdmin {
+    uint id;
+    for(uint i = 0; i < ids.length; i += 1) {
+      id = ids[i];
+      deposit_address_deleted[id] = true;
+    }
+    emit Delete_Deposit_Addresses(ids);
+  }
+
   function set_fee_wallet(address _fee_wallet) external onlyAdmin {
     fee_wallet = _fee_wallet;
     emit Set_Fee_Wallet(_fee_wallet);
@@ -248,5 +268,9 @@ contract JaxBridgeV2 {
   function set_admin(address _admin) external onlyAdmin {
     admin = _admin;
     emit Set_Admin(_admin);
+  }
+
+  function get_new_request_id() external view returns(uint) {
+    return requests.length;
   }
 }
