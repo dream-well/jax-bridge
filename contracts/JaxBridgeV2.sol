@@ -146,6 +146,7 @@ contract JaxBridgeV2 {
     }
     require(request.valid_until >= block.timestamp, "Expired");
     bytes32 txdHash = keccak256(abi.encodePacked(tx_hash));
+    require(proccessed_txd_hashes[txdHash] == false, "Invalid txd hash");
     request.txdHash = txdHash;
     request.status = RequestStatus.Proved;
     request.prove_timestamp = block.timestamp;
