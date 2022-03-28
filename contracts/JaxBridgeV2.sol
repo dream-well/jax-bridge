@@ -50,7 +50,7 @@ contract JaxBridgeV2 {
   mapping(bytes32 => bool) proccessed_txd_hashes;
 
   event Create_Request(uint request_id, uint amount, string from, uint depoist_address_id, uint valid_until);
-  event Prove_Request(uint request_id);
+  event Prove_Request(uint request_id, string tx_hash);
   event Expire_Request(uint request_id);
   event Reject_Request(uint request_id);
   event Release(uint request_id, address from, uint amount);
@@ -134,7 +134,7 @@ contract JaxBridgeV2 {
     emit Create_Request(request_id, amount, from, deposit_address_id, valid_until);
   }
 
-  function prove_request(uint request_id, bytes32 txdHash) external {
+  function prove_request(uint request_id, string calldata tx_hash) external {
     Request storage request = requests[request_id];
     require(request.to == msg.sender, "Invalid account");
     require(request.status == RequestStatus.Init, "Invalid status");
@@ -145,12 +145,12 @@ contract JaxBridgeV2 {
       return;
     }
     require(request.valid_until >= block.timestamp, "Expired");
-    require(proccessed_txd_hashes[txdHash] == false, "Invalid txd hash");
+    bytes32 txdHash = keccak256(abi.encodePacked(tx_hash));
     request.txdHash = txdHash;
     request.status = RequestStatus.Proved;
     request.prove_timestamp = block.timestamp;
     request.amount = 0;
-    emit Prove_Request(request_id);
+    emit Prove_Request(request_id, tx_hash);
   }
 
   function reject_request(uint request_id) external onlyOperator {
