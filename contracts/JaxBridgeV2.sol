@@ -138,13 +138,12 @@ contract JaxBridgeV2 {
     Request storage request = requests[request_id];
     require(request.to == msg.sender, "Invalid account");
     require(request.status == RequestStatus.Init, "Invalid status");
-    if(request.valid_until >= block.timestamp) {
+    if(request.valid_until < block.timestamp) {
       request.status = RequestStatus.Expired;
       request.prove_timestamp = block.timestamp;
       emit Expire_Request(request_id);
       return;
     }
-    require(request.valid_until >= block.timestamp, "Expired");
     bytes32 txdHash = keccak256(abi.encodePacked(tx_hash));
     require(proccessed_txd_hashes[txdHash] == false, "Invalid tx hash");
     request.txdHash = txdHash;
