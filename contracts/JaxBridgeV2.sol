@@ -17,7 +17,7 @@ contract JaxBridgeV2 {
 
   address public penalty_wallet;
 
-  IERC20 public wjxn = IERC20(0xA25946ec9D37dD826BbE0cbDbb2d79E69834e41e);
+  IERC20 public wjxn = IERC20(0xcA1262e77Fb25c0a4112CFc9bad3ff54F617f2e6);
 
 
   enum RequestStatus {Init, Proved, Rejected, Expired, Released}
