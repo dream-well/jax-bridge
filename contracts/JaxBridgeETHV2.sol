@@ -24,7 +24,7 @@ contract JaxBridgeETHV2 {
     uint destChainId;
     uint amount;
     address to;
-    uint date;
+    uint deposit_timestamp;
     bytes32 depositHash;
   }
 
@@ -37,7 +37,7 @@ contract JaxBridgeETHV2 {
 
   mapping(bytes32 => bool) proccessed_deposit_hashes;
 
-  event Deposit(uint indexed request_id, bytes32 indexed depositHash, address indexed to, uint amount, uint64 srcChainId, uint64 destChainId, uint128 date);
+  event Deposit(uint indexed request_id, bytes32 indexed depositHash, address indexed to, uint amount, uint64 srcChainId, uint64 destChainId, uint128 deposit_timestamp);
   event Release(
     uint indexed request_id, 
     bytes32 indexed depositHash, 
@@ -46,8 +46,8 @@ contract JaxBridgeETHV2 {
     uint released_amount, 
     uint64 srcChainId, 
     uint64 destChainId, 
-    uint128 deposited_date, 
-    uint128 released_date,
+    uint128 deposit_timestamp, 
+    uint128 released_deposit_timestamp,
     string txHash
   );
   event Reject_Request(uint request_id);
@@ -97,7 +97,7 @@ contract JaxBridgeETHV2 {
       destChainId: destChainId,
       amount: amount,
       to: msg.sender,
-      date: block.timestamp,
+      deposit_timestamp: block.timestamp,
       depositHash: depositHash
     });
     requests.push(request);
@@ -111,12 +111,12 @@ contract JaxBridgeETHV2 {
     uint srcChainId,
     uint destChainId,
     uint amount,
-    uint deposited_date,
+    uint deposit_timestamp,
     bytes32 depositHash,
     string calldata txHash
   ) external onlyOperator {
     require( destChainId == chainId, "Incorrect destination network" );
-    require( depositHash == keccak256(abi.encodePacked(request_id, to, srcChainId, chainId, amount)), "Incorrect deposit hash");
+    require( depositHash == keccak256(abi.encodePacked(request_id, to, srcChainId, chainId, amount, deposit_timestamp)), "Incorrect deposit hash");
     require( proccessed_deposit_hashes[depositHash] == false, "Already processed" );
     uint fee_amount = amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
@@ -137,7 +137,7 @@ contract JaxBridgeETHV2 {
     }
     operating_limits[msg.sender] -= amount;
     proccessed_deposit_hashes[depositHash] = true;
-    emit Release(request_id, depositHash, to, amount, amount - fee_amount, uint64(srcChainId), uint64(destChainId), uint128(deposited_date), uint128(block.timestamp), txHash);
+    emit Release(request_id, depositHash, to, amount, amount - fee_amount, uint64(srcChainId), uint64(destChainId), uint128(deposit_timestamp), uint128(block.timestamp), txHash);
   }
 
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
