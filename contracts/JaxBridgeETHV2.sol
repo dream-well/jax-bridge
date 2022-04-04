@@ -47,7 +47,6 @@ contract JaxBridgeETHV2 {
     uint64 srcChainId, 
     uint64 destChainId, 
     uint128 deposit_timestamp, 
-    uint128 released_deposit_timestamp,
     string txHash
   );
   event Reject_Request(uint request_id);
@@ -137,7 +136,7 @@ contract JaxBridgeETHV2 {
     }
     operating_limits[msg.sender] -= amount;
     proccessed_deposit_hashes[depositHash] = true;
-    emit Release(request_id, depositHash, to, amount, amount - fee_amount, uint64(srcChainId), uint64(destChainId), uint128(deposit_timestamp), uint128(block.timestamp), txHash);
+    emit Release(request_id, depositHash, to, amount, amount - fee_amount, uint64(srcChainId), uint64(destChainId), uint128(deposit_timestamp), txHash);
   }
 
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
