@@ -19,9 +19,6 @@ contract JaxBridgeETHV2 {
 
   IERC20 public wjxn = IERC20(0xA25946ec9D37dD826BbE0cbDbb2d79E69834e41e); //0xcA1262e77Fb25c0a4112CFc9bad3ff54F617f2e6
 
-
-  enum RequestStatus {Init, Proved, Rejected, Expired, Released}
-
   struct Request {
     uint srcChainId;
     uint destChainId;
@@ -120,7 +117,7 @@ contract JaxBridgeETHV2 {
   ) external onlyOperator {
     require( destChainId == chainId, "Incorrect destination network" );
     require( depositHash == keccak256(abi.encodePacked(request_id, to, srcChainId, chainId, amount)), "Incorrect deposit hash");
-
+    require( proccessed_deposit_hashes[depositHash] == false, "Already processed" );
     uint fee_amount = amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
     wjxn.transfer(to, amount - fee_amount);
@@ -139,6 +136,7 @@ contract JaxBridgeETHV2 {
       wjxn.transfer(msg.sender, fee_amount);
     }
     operating_limits[msg.sender] -= amount;
+    proccessed_deposit_hashes[depositHash] = true;
     emit Release(request_id, depositHash, to, amount, amount - fee_amount, uint64(srcChainId), uint64(destChainId), uint128(deposited_date), uint128(block.timestamp), txHash);
   }
 
