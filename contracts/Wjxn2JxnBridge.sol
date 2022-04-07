@@ -4,12 +4,12 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-contract JaxBridgeETHV2 {
+contract Wjxn2JxnBridge {
 
   uint chainId;
   
   uint public fee_percent = 5e5; // 0.5 %
-  uint public minimum_fee_amount = 50; // 50 WJXN
+  uint public minimum_fee_amount = 50; // 50 wjxn
 
   address public admin;
 
@@ -17,15 +17,19 @@ contract JaxBridgeETHV2 {
 
   address public penalty_wallet;
 
-  IERC20 public wjxn = IERC20(0xBC04b1cEEE41760CBd84d3D58Db57a13c95B8107); //0xcA1262e77Fb25c0a4112CFc9bad3ff54F617f2e6
+  IERC20 public wjxn = IERC20(0xBC04b1cEEE41760CBd84d3D58Db57a13c95B8107); 
+
+
+  enum RequestStatus {Init, Released}
 
   struct Request {
-    uint srcChainId;
-    uint destChainId;
     uint amount;
-    address to;
-    uint deposit_timestamp;
-    bytes32 depositHash;
+    uint created_at;
+    uint released_at;
+    address from;
+    RequestStatus status;
+    string to;
+    string txHash;
   }
 
   Request[] public requests;
@@ -35,26 +39,14 @@ contract JaxBridgeETHV2 {
   address[] public bridge_operators;
   mapping(address => uint) operating_limits;
 
-  mapping(bytes32 => bool) proccessed_deposit_hashes;
+  mapping(bytes32 => bool) proccessed_txd_hashes;
 
-  event Deposit(uint indexed request_id, bytes32 indexed depositHash, address indexed to, uint amount, uint64 srcChainId, uint64 destChainId, uint128 deposit_timestamp);
-  event Release(
-    uint indexed request_id, 
-    bytes32 indexed depositHash, 
-    address indexed to, 
-    uint deposited_amount, 
-    uint released_amount, 
-    uint64 srcChainId, 
-    uint64 destChainId, 
-    uint128 deposit_timestamp, 
-    string txHash
-  );
-  event Reject_Request(uint request_id);
+  event Create_Request(uint request_id, uint amount, address from, string to);
+  event Release(uint request_id, string to, uint amount, string txHash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Set_Operating_Limit(address operator, uint operating_limit);
   event Set_Penalty_Wallet(address wallet);
   event Set_Admin(address admin);
-  event Delete_Deposit_Addresses(uint[] ids);
   event Add_Penalty_Amount(uint amount, bytes32 info_hash);
   event Subtract_Penalty_Amount(uint amount, bytes32 info_hash);
 
@@ -73,6 +65,7 @@ contract JaxBridgeETHV2 {
     _;
   }
 
+
   modifier onlyOperator() {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
     _;
@@ -86,40 +79,42 @@ contract JaxBridgeETHV2 {
     wjxn.transfer(admin, amount);
   }
 
-  function deposit(uint destChainId, uint amount) external payable {
-    require(amount >= minimum_fee_amount, "Minimum amount");
-    require(chainId != destChainId, "Invalid Destnation network");
+  function create_request(uint amount, string calldata to) external 
+  {
+    require(amount > minimum_fee_amount, "Below minimum amount");
     uint request_id = requests.length;
-    bytes32 depositHash = keccak256(abi.encodePacked(request_id, msg.sender, chainId, destChainId, amount, block.timestamp));
-    Request memory request = Request({
-      srcChainId: chainId,
-      destChainId: destChainId,
-      amount: amount,
-      to: msg.sender,
-      deposit_timestamp: block.timestamp,
-      depositHash: depositHash
-    });
+    Request memory request;
+    request.amount = amount;
+    request.to = to;
+    request.from = msg.sender;
+    request.created_at = block.timestamp;
     requests.push(request);
+    user_requests[msg.sender].push(request_id);
     wjxn.transferFrom(msg.sender, address(this), amount);
-    emit Deposit(request_id, depositHash, msg.sender, amount, uint64(chainId), uint64(destChainId), uint128(block.timestamp));
+    emit Create_Request(request_id, amount, msg.sender, to);
   }
 
   function release(
     uint request_id,
-    address to,
-    uint srcChainId,
-    uint destChainId,
     uint amount,
-    uint deposit_timestamp,
-    bytes32 depositHash,
+    address from,
+    string calldata to,
     string calldata txHash
   ) external onlyOperator {
-    require( destChainId == chainId, "Incorrect destination network" );
-    require( depositHash == keccak256(abi.encodePacked(request_id, to, srcChainId, chainId, amount, deposit_timestamp)), "Incorrect deposit hash");
-    require( proccessed_deposit_hashes[depositHash] == false, "Already processed" );
-    uint fee_amount = amount * fee_percent / 1e8;
+    Request storage request = requests[request_id];
+    bytes32 txd_hash = keccak256(abi.encodePacked(txHash));
+    require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
+    require(request.status == RequestStatus.Init, "Invalid status");
+    require(request.from == from, "Invalid sender address");
+    require(keccak256(abi.encodePacked(request.to)) == keccak256(abi.encodePacked(to)), "Destination address mismatch");
+    require(proccessed_txd_hashes[txd_hash] == false, "TxHash already used");
+    request.txHash = txHash;
+    request.amount = amount;
+    request.released_at = block.timestamp;
+    request.status = RequestStatus.Released;
+    proccessed_txd_hashes[keccak256(abi.encodePacked(txHash))] = true;
+    uint fee_amount = request.amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
-    wjxn.transfer(to, amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
         wjxn.transfer(penalty_wallet, fee_amount);
@@ -135,8 +130,11 @@ contract JaxBridgeETHV2 {
       wjxn.transfer(msg.sender, fee_amount);
     }
     operating_limits[msg.sender] -= amount;
-    proccessed_deposit_hashes[depositHash] = true;
-    emit Release(request_id, depositHash, to, amount, amount - fee_amount, uint64(srcChainId), uint64(destChainId), uint128(deposit_timestamp), txHash);
+    emit Release(request_id, request.to, request.amount - fee_amount, txHash);
+  }
+
+  function get_user_requests(address user) external view returns(uint[] memory) {
+    return user_requests[user];
   }
 
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
