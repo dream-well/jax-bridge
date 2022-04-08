@@ -30,7 +30,8 @@ contract Wjax2JaxBridge {
     address from;
     RequestStatus status;
     string to;
-    string txHash;
+    string local_txHash;
+    string jaxnet_txHash;
   }
 
   Request[] public requests;
@@ -42,7 +43,7 @@ contract Wjax2JaxBridge {
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
 
-  event Create_Request(uint request_id, uint shard_id, uint amount, address from, string to);
+  event Prove_Request(uint request_id, uint shard_id, uint amount, address from, string to);
   event Release(uint request_id, string to, uint amount, string txHash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Set_Operating_Limit(address operator, uint operating_limit);
@@ -80,7 +81,7 @@ contract Wjax2JaxBridge {
     wjax.transfer(admin, amount);
   }
 
-  function create_request(uint shard_id, uint amount, string calldata to) external 
+  function prove_request(uint shard_id, uint amount, string calldata to) external 
   {
     require(shard_id >= 1 && shard_id <= 4, "Invalid shard id");
     require(amount > minimum_fee_amount, "Below minimum amount");
@@ -94,7 +95,7 @@ contract Wjax2JaxBridge {
     requests.push(request);
     user_requests[msg.sender].push(request_id);
     wjax.transferFrom(msg.sender, address(this), amount);
-    emit Create_Request(request_id, shard_id, amount, msg.sender, to);
+    emit Prove_Request(request_id, shard_id, amount, msg.sender, to);
   }
 
   function release(
@@ -103,21 +104,26 @@ contract Wjax2JaxBridge {
     uint amount,
     address from,
     string calldata to,
-    string calldata txHash
+    string calldata local_txHash,
+    string calldata jaxnet_txHash
   ) external onlyOperator {
     Request storage request = requests[request_id];
-    bytes32 txd_hash = keccak256(abi.encodePacked(txHash));
+    bytes32 jaxnet_txd_hash = keccak256(abi.encodePacked(jaxnet_txHash));
+    bytes32 local_txd_hash = keccak256(abi.encodePacked(local_txHash));
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
     require(request.status == RequestStatus.Init, "Invalid status");
     require(request.from == from, "Invalid sender address");
     require(request.shard_id == shard_id, "Invalid shard id");
     require(keccak256(abi.encodePacked(request.to)) == keccak256(abi.encodePacked(to)), "Destination address mismatch");
-    require(proccessed_txd_hashes[txd_hash] == false, "TxHash already used");
-    request.txHash = txHash;
+    require(proccessed_txd_hashes[jaxnet_txd_hash] == false, "Jaxnet TxHash already used");
+    require(proccessed_txd_hashes[local_txd_hash] == false, "Local TxHash already used");
+    request.jaxnet_txHash = jaxnet_txHash;
+    request.local_txHash = local_txHash;
     request.amount = amount;
     request.released_at = block.timestamp;
     request.status = RequestStatus.Released;
-    proccessed_txd_hashes[keccak256(abi.encodePacked(txHash))] = true;
+    proccessed_txd_hashes[jaxnet_txd_hash] = true;
+    proccessed_txd_hashes[local_txd_hash] = true;
     uint fee_amount = request.amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
     if(penalty_amount > 0) {
@@ -135,7 +141,7 @@ contract Wjax2JaxBridge {
       wjax.transfer(msg.sender, fee_amount);
     }
     operating_limits[msg.sender] -= amount;
-    emit Release(request_id, request.to, request.amount - fee_amount, txHash);
+    emit Release(request_id, request.to, request.amount - fee_amount, jaxnet_txHash);
   }
 
   function get_user_requests(address user) external view returns(uint[] memory) {
