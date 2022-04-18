@@ -89,7 +89,7 @@ contract JaxBridgeETHV2 {
     wjxn.transfer(admin, amount);
   }
 
-  function deposit(uint destChainId, uint amount) external payable {
+  function deposit(uint destChainId, uint amount) external {
     require(amount >= minimum_fee_amount, "Minimum amount");
     require(chainId != destChainId, "Invalid Destnation network");
     uint request_id = requests.length;
