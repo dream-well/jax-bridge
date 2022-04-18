@@ -111,6 +111,7 @@ contract Wjax2JaxBridge {
     bytes32 jaxnet_txd_hash = keccak256(abi.encodePacked(jaxnet_txHash));
     bytes32 local_txd_hash = keccak256(abi.encodePacked(local_txHash));
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
+    require(request.amount == amount, "Incorrect amount");
     require(request.status == RequestStatus.Init, "Invalid status");
     require(request.from == from, "Invalid sender address");
     require(request.shard_id == shard_id, "Invalid shard id");
@@ -119,7 +120,6 @@ contract Wjax2JaxBridge {
     require(proccessed_txd_hashes[local_txd_hash] == false, "Local TxHash already used");
     request.jaxnet_txHash = jaxnet_txHash;
     request.local_txHash = local_txHash;
-    request.amount = amount;
     request.released_at = block.timestamp;
     request.status = RequestStatus.Released;
     proccessed_txd_hashes[jaxnet_txd_hash] = true;
