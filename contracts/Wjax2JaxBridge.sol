@@ -83,7 +83,7 @@ contract Wjax2JaxBridge {
 
   function prove_request(uint shard_id, uint amount, string calldata to) external 
   {
-    require(shard_id >= 1 && shard_id <= 4, "Invalid shard id");
+    require(shard_id >= 1 && shard_id <= 3, "Invalid shard id");
     require(amount > minimum_fee_amount, "Below minimum amount");
     uint request_id = requests.length;
     Request memory request;
