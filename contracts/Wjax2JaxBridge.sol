@@ -25,6 +25,7 @@ contract Wjax2JaxBridge {
   struct Request {
     uint shard_id;
     uint amount;
+    uint fee_amount;
     uint created_at;
     uint released_at;
     address from;
@@ -88,7 +89,10 @@ contract Wjax2JaxBridge {
     uint request_id = requests.length;
     Request memory request;
     request.shard_id = shard_id;
-    request.amount = amount;
+    uint fee_amount = request.amount * fee_percent / 1e8;
+    if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
+    request.amount = amount - fee_amount;
+    request.fee_amount = fee_amount;
     request.to = to;
     request.from = msg.sender;
     request.created_at = block.timestamp;
@@ -124,8 +128,7 @@ contract Wjax2JaxBridge {
     request.status = RequestStatus.Released;
     proccessed_txd_hashes[jaxnet_txd_hash] = true;
     proccessed_txd_hashes[local_txd_hash] = true;
-    uint fee_amount = request.amount * fee_percent / 1e8;
-    if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
+    uint fee_amount = request.fee_amount;
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
         wjax.transfer(penalty_wallet, fee_amount);
@@ -141,7 +144,7 @@ contract Wjax2JaxBridge {
       wjax.transfer(msg.sender, fee_amount);
     }
     operating_limits[msg.sender] -= amount;
-    emit Release(request_id, request.to, request.amount - fee_amount, jaxnet_txHash);
+    emit Release(request_id, request.to, request.amount, jaxnet_txHash);
   }
 
   function get_user_requests(address user) external view returns(uint[] memory) {
