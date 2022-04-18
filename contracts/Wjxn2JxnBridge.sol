@@ -43,7 +43,7 @@ contract Wjxn2JxnBridge {
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
 
-  event Prove_Request(uint request_id, uint amount, address from, string to);
+  event Prove_Request(uint request_id, uint amount, uint fee_amount, address from, string to);
   event Release(uint request_id, string to, uint amount, string txHash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Set_Operating_Limit(address operator, uint operating_limit);
@@ -96,7 +96,7 @@ contract Wjxn2JxnBridge {
     requests.push(request);
     user_requests[msg.sender].push(request_id);
     wjxn.transferFrom(msg.sender, address(this), amount);
-    emit Prove_Request(request_id, amount, msg.sender, to);
+    emit Prove_Request(request_id, amount, fee_amount, msg.sender, to);
   }
 
   function release(
