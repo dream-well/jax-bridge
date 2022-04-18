@@ -124,7 +124,6 @@ contract Wjxn2JxnBridge {
     proccessed_txd_hashes[jaxnet_txd_hash] = true;
     proccessed_txd_hashes[local_txd_hash] = true;
     uint fee_amount = request.fee_amount;
-    if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
         wjxn.transfer(penalty_wallet, fee_amount);
