@@ -2,7 +2,11 @@
 
 pragma solidity 0.8.11;
 
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
+interface IWJAX {
+  function burnFrom(address account, uint amount) external;    
+  function transfer(address recipient, uint256 amount) external returns (bool);
+  event Transfer(address indexed from, address indexed to, uint256 value);
+}
 
 contract Wjax2JaxBridge {
 
@@ -17,8 +21,7 @@ contract Wjax2JaxBridge {
 
   address public penalty_wallet;
 
-  IERC20 public wjax = IERC20(0xe578Feb7B106530A6086C22A2D469aD83cA008f4); 
-
+  IWJAX public wjax = IWJAX(0xe578Feb7B106530A6086C22A2D469aD83cA008f4); 
 
   enum RequestStatus {Init, Released}
 
@@ -74,14 +77,6 @@ contract Wjax2JaxBridge {
     _;
   }
 
-  function deposit(uint amount) external onlyAdmin {
-    wjax.transferFrom(admin, address(this), amount);
-  }
-
-  function withdraw(uint amount) external onlyAdmin {
-    wjax.transfer(admin, amount);
-  }
-
   function prove_request(uint shard_id, uint amount, string calldata to) external 
   {
     require(shard_id >= 1 && shard_id <= 3, "Invalid shard id");
@@ -98,7 +93,7 @@ contract Wjax2JaxBridge {
     request.created_at = block.timestamp;
     requests.push(request);
     user_requests[msg.sender].push(request_id);
-    wjax.transferFrom(msg.sender, address(this), amount);
+    wjax.burnFrom(msg.sender, amount);
     emit Prove_Request(request_id, shard_id, amount, fee_amount, msg.sender, to);
   }
 
@@ -149,10 +144,6 @@ contract Wjax2JaxBridge {
 
   function get_user_requests(address user) external view returns(uint[] memory) {
     return user_requests[user];
-  }
-
-  function withdrawByAdmin(address token, uint amount) external onlyAdmin {
-      IERC20(token).transfer(msg.sender, amount);
   }
 
   function add_bridge_operator(address operator, uint operating_limit) external onlyAdmin {

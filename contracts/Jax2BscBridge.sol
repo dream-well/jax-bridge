@@ -2,7 +2,9 @@
 
 pragma solidity 0.8.11;
 
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
+interface IWJAX {
+  function mint(address account, uint amount) external;
+}
 
 contract Jax2BscBridge {
 
@@ -17,7 +19,7 @@ contract Jax2BscBridge {
 
   address public penalty_wallet;
 
-  IERC20 public wjax = IERC20(0xe578Feb7B106530A6086C22A2D469aD83cA008f4);
+  IWJAX public wjax = IWJAX(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
 
 
   enum RequestStatus {Init, Proved, Rejected, Expired, Released}
@@ -88,14 +90,6 @@ contract Jax2BscBridge {
   modifier isValidDepositAddress(uint deposit_address_id) {
     require(deposit_address_deleted[deposit_address_id] == false, "Deposit address deleted");
     _;
-  }
-
-  function deposit(uint amount) external onlyAdmin {
-    wjax.transferFrom(admin, address(this), amount);
-  }
-
-  function withdraw(uint amount) external onlyAdmin {
-    wjax.transfer(admin, amount);
   }
 
   function add_deposit_addresses(string[] calldata new_addresses) external onlyAdmin {
@@ -185,20 +179,20 @@ contract Jax2BscBridge {
     proccessed_txd_hashes[request.txdHash] = true;
     uint fee_amount = request.amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
-    wjax.transfer(request.to, request.amount - fee_amount);
+    wjax.mint(request.to, request.amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
-        wjax.transfer(penalty_wallet, fee_amount);
+        wjax.mint(penalty_wallet, fee_amount);
         penalty_amount -= fee_amount;
       }
       else {
-        wjax.transfer(penalty_wallet, penalty_amount);
-        wjax.transfer(msg.sender, fee_amount - penalty_amount);
+        wjax.mint(penalty_wallet, penalty_amount);
+        wjax.mint(msg.sender, fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.transfer(msg.sender, fee_amount);
+      wjax.mint(msg.sender, fee_amount);
     }
     operating_limits[msg.sender] -= amount;
     emit Release(request_id, request.to, request.amount - fee_amount);
@@ -206,10 +200,6 @@ contract Jax2BscBridge {
 
   function get_user_requests(address user) external view returns(uint[] memory) {
     return user_requests[user];
-  }
-
-  function withdrawByAdmin(address token, uint amount) external onlyAdmin {
-      IERC20(token).transfer(msg.sender, amount);
   }
 
   function add_bridge_operator(address operator, uint operating_limit) external onlyAdmin {
