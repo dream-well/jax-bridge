@@ -9,7 +9,7 @@ contract JaxBridgeETHV2 {
   uint chainId;
   
   uint public fee_percent = 5e5; // 0.5 %
-  uint public minimum_fee_amount = 50; // 50 wjax
+  uint public minimum_fee_amount = 50; // 50 WJXN
 
   address public admin;
 
@@ -17,7 +17,7 @@ contract JaxBridgeETHV2 {
 
   address public penalty_wallet;
 
-  IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
+  IERC20 public wjxn = IERC20(0xBC04b1cEEE41760CBd84d3D58Db57a13c95B8107); //0xcA1262e77Fb25c0a4112CFc9bad3ff54F617f2e6
 
   struct Request {
     uint srcChainId;
@@ -82,11 +82,11 @@ contract JaxBridgeETHV2 {
   }
 
   function deposit(uint amount) external onlyAdmin {
-    wjax.transferFrom(admin, address(this), amount);
+    wjxn.transferFrom(admin, address(this), amount);
   }
 
   function withdraw(uint amount) external onlyAdmin {
-    wjax.transfer(admin, amount);
+    wjxn.transfer(admin, amount);
   }
 
   function deposit(uint destChainId, uint amount) external {
@@ -106,7 +106,7 @@ contract JaxBridgeETHV2 {
       depositHash: depositHash
     });
     requests.push(request);
-    wjax.transferFrom(msg.sender, address(this), amount);
+    wjxn.transferFrom(msg.sender, address(this), amount);
     emit Deposit(request_id, depositHash, msg.sender, amount, fee_amount, uint64(chainId), uint64(destChainId), uint128(block.timestamp));
   }
 
@@ -125,20 +125,20 @@ contract JaxBridgeETHV2 {
     require( depositHash == keccak256(abi.encodePacked(request_id, to, srcChainId, chainId, amount, fee_amount, deposit_timestamp)), "Incorrect deposit hash");
     bytes32 _txHash = keccak256(abi.encodePacked(txHash));
     require( proccessed_deposit_hashes[depositHash] == false && proccessed_tx_hashes[_txHash] == false, "Already processed" );
-    wjax.transfer(to, amount - fee_amount);
+    wjxn.transfer(to, amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
-        wjax.transfer(penalty_wallet, fee_amount);
+        wjxn.transfer(penalty_wallet, fee_amount);
         penalty_amount -= fee_amount;
       }
       else {
-        wjax.transfer(penalty_wallet, penalty_amount);
-        wjax.transfer(msg.sender, fee_amount - penalty_amount);
+        wjxn.transfer(penalty_wallet, penalty_amount);
+        wjxn.transfer(msg.sender, fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.transfer(msg.sender, fee_amount);
+      wjxn.transfer(msg.sender, fee_amount);
     }
     operating_limits[msg.sender] -= amount;
     proccessed_deposit_hashes[depositHash] = true;

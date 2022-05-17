@@ -3,8 +3,9 @@
 pragma solidity 0.8.11;
 
 interface IWJAX {
-  function mint(address account, uint amount) external;
-  function burnFrom(address account, uint amount) external;
+  function mint(address, uint) external;
+  function burn(uint) external;
+  function transferFrom(address, address, uint) external;
 }
 
 contract WjaxEthBridge {
@@ -101,7 +102,8 @@ contract WjaxEthBridge {
       depositHash: depositHash
     });
     requests.push(request);
-    wjax.burnFrom(msg.sender, amount);
+    wjax.transferFrom(msg.sender, address(this), amount);
+    wjax.burn(amount);
     emit Deposit(request_id, depositHash, msg.sender, amount, fee_amount, uint64(chainId), uint64(destChainId), uint128(block.timestamp));
   }
 
