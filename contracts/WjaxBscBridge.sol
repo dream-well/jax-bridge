@@ -4,7 +4,7 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-contract JaxBridgeETHV2 {
+contract WjaxEthBridge {
 
   uint chainId;
   
@@ -79,10 +79,6 @@ contract JaxBridgeETHV2 {
   modifier onlyOperator() {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
     _;
-  }
-
-  function deposit(uint amount) external onlyAdmin {
-    wjax.transferFrom(admin, address(this), amount);
   }
 
   function withdraw(uint amount) external onlyAdmin {
