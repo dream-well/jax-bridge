@@ -2,8 +2,9 @@
 
 pragma solidity 0.8.11;
 
-interface IWJAX {
+interface IERC20 {
   function mint(address account, uint amount) external;
+  function transfer(address, uint) external;
 }
 
 contract Jax2BscBridge {
@@ -19,7 +20,7 @@ contract Jax2BscBridge {
 
   address public penalty_wallet;
 
-  IWJAX public wjax = IWJAX(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
+  IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
 
 
   enum RequestStatus {Init, Proved, Rejected, Expired, Released}
@@ -179,7 +180,8 @@ contract Jax2BscBridge {
     proccessed_txd_hashes[request.txdHash] = true;
     uint fee_amount = request.amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
-    wjax.mint(request.to, request.amount - fee_amount);
+    wjax.mint(address(this), request.amount - fee_amount);
+    wjax.transfer(request.to, request.amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
         wjax.mint(penalty_wallet, fee_amount);

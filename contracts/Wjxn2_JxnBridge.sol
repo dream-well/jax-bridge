@@ -2,14 +2,18 @@
 
 pragma solidity 0.8.11;
 
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
+interface IERC20 {
+  function burn(uint) external;
+  function transfer(address, uint) external;
+  function transferFrom(address, address, uint) external;
+}
 
-contract WjaxBscBridge {
+contract Wjxn2JxnBridge {
 
   uint chainId;
   
   uint public fee_percent = 5e5; // 0.5 %
-  uint public minimum_fee_amount = 50; // 50 wjax
+  uint public minimum_fee_amount = 50; // 50 wjxn2
 
   address public admin;
 
@@ -17,16 +21,21 @@ contract WjaxBscBridge {
 
   address public penalty_wallet;
 
-  IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
+  IERC20 public wjxn2 = IERC20(0xe3345c59ECd8B9C157Dd182BA9500aace899AD31); 
+
+
+  enum RequestStatus {Init, Released}
 
   struct Request {
-    uint srcChainId;
-    uint destChainId;
     uint amount;
     uint fee_amount;
-    address to;
-    uint deposit_timestamp;
-    bytes32 depositHash;
+    uint created_at;
+    uint released_at;
+    address from;
+    RequestStatus status;
+    string to;
+    string local_txHash;
+    string jaxnet_txHash;
   }
 
   Request[] public requests;
@@ -36,28 +45,14 @@ contract WjaxBscBridge {
   address[] public bridge_operators;
   mapping(address => uint) operating_limits;
 
-  mapping(bytes32 => bool) proccessed_deposit_hashes;
-  mapping(bytes32 => bool) proccessed_tx_hashes;
+  mapping(bytes32 => bool) proccessed_txd_hashes;
 
-  event Deposit(uint indexed request_id, bytes32 indexed depositHash, address indexed to, uint amount, uint fee_amount, uint64 srcChainId, uint64 destChainId, uint128 deposit_timestamp);
-  event Release(
-    uint indexed request_id, 
-    bytes32 indexed depositHash, 
-    address indexed to, 
-    uint deposited_amount, 
-    uint fee_amount,
-    uint released_amount, 
-    uint64 srcChainId, 
-    uint64 destChainId, 
-    uint128 deposit_timestamp, 
-    string txHash
-  );
-  event Reject_Request(uint request_id);
+  event Prove_Request(uint request_id, uint amount, uint fee_amount, address from, string to);
+  event Release(uint request_id, string to, uint amount, string txHash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Set_Operating_Limit(address operator, uint operating_limit);
   event Set_Penalty_Wallet(address wallet);
   event Set_Admin(address admin);
-  event Delete_Deposit_Addresses(uint[] ids);
   event Add_Penalty_Amount(uint amount, bytes32 info_hash);
   event Subtract_Penalty_Amount(uint amount, bytes32 info_hash);
 
@@ -76,70 +71,76 @@ contract WjaxBscBridge {
     _;
   }
 
+
   modifier onlyOperator() {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
     _;
   }
 
-  function withdraw(uint amount) external onlyAdmin {
-    wjax.transfer(admin, amount);
-  }
-
-  function deposit(uint destChainId, uint amount) external {
-    require(amount >= minimum_fee_amount, "Minimum amount");
-    require(chainId != destChainId, "Invalid Destnation network");
+  function prove_request(uint amount, string calldata to) external 
+  {
+    require(amount > minimum_fee_amount, "Below minimum amount");
     uint request_id = requests.length;
-    uint fee_amount = amount * fee_percent / 1e8;
+    Request memory request;
+    uint fee_amount = request.amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
-    bytes32 depositHash = keccak256(abi.encodePacked(request_id, msg.sender, chainId, destChainId, amount, fee_amount, block.timestamp));
-    Request memory request = Request({
-      srcChainId: chainId,
-      destChainId: destChainId,
-      amount: amount,
-      fee_amount: fee_amount,
-      to: msg.sender,
-      deposit_timestamp: block.timestamp,
-      depositHash: depositHash
-    });
+    request.amount = amount - fee_amount;
+    request.fee_amount = fee_amount;
+    request.to = to;
+    request.from = msg.sender;
+    request.created_at = block.timestamp;
     requests.push(request);
-    wjax.transferFrom(msg.sender, address(this), amount);
-    emit Deposit(request_id, depositHash, msg.sender, amount, fee_amount, uint64(chainId), uint64(destChainId), uint128(block.timestamp));
+    user_requests[msg.sender].push(request_id);
+    wjxn2.transferFrom(msg.sender, address(this), amount);
+    emit Prove_Request(request_id, amount, fee_amount, msg.sender, to);
   }
 
   function release(
     uint request_id,
-    address to,
-    uint srcChainId,
-    uint destChainId,
     uint amount,
-    uint fee_amount,
-    uint deposit_timestamp,
-    bytes32 depositHash,
-    string calldata txHash
+    address from,
+    string calldata to,
+    string calldata local_txHash,
+    string calldata jaxnet_txHash
   ) external onlyOperator {
-    require( destChainId == chainId, "Incorrect destination network" );
-    require( depositHash == keccak256(abi.encodePacked(request_id, to, srcChainId, chainId, amount, fee_amount, deposit_timestamp)), "Incorrect deposit hash");
-    bytes32 _txHash = keccak256(abi.encodePacked(txHash));
-    require( proccessed_deposit_hashes[depositHash] == false && proccessed_tx_hashes[_txHash] == false, "Already processed" );
-    wjax.transfer(to, amount - fee_amount);
+    Request storage request = requests[request_id];
+    bytes32 jaxnet_txd_hash = keccak256(abi.encodePacked(jaxnet_txHash));
+    bytes32 local_txd_hash = keccak256(abi.encodePacked(local_txHash));
+    require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
+    require(request.amount == amount, "Incorrect amount");
+    require(request.status == RequestStatus.Init, "Invalid status");
+    require(request.from == from, "Invalid sender address");
+    require(keccak256(abi.encodePacked(request.to)) == keccak256(abi.encodePacked(to)), "Destination address mismatch");
+    require(proccessed_txd_hashes[jaxnet_txd_hash] == false, "Jaxnet TxHash already used");
+    require(proccessed_txd_hashes[local_txd_hash] == false, "Local TxHash already used");
+    request.jaxnet_txHash = jaxnet_txHash;
+    request.local_txHash = local_txHash;
+    request.released_at = block.timestamp;
+    request.status = RequestStatus.Released;
+    proccessed_txd_hashes[jaxnet_txd_hash] = true;
+    proccessed_txd_hashes[local_txd_hash] = true;
+    uint fee_amount = request.fee_amount;
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
-        wjax.transfer(penalty_wallet, fee_amount);
+        wjxn2.transfer(penalty_wallet, fee_amount);
         penalty_amount -= fee_amount;
       }
       else {
-        wjax.transfer(penalty_wallet, penalty_amount);
-        wjax.transfer(msg.sender, fee_amount - penalty_amount);
+        wjxn2.transfer(penalty_wallet, penalty_amount);
+        wjxn2.transfer(msg.sender, fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.transfer(msg.sender, fee_amount);
+      wjxn2.transfer(msg.sender, fee_amount);
     }
+    wjxn2.burn(amount - fee_amount);
     operating_limits[msg.sender] -= amount;
-    proccessed_deposit_hashes[depositHash] = true;
-    proccessed_tx_hashes[_txHash] = true;
-    emit Release(request_id, depositHash, to, amount, fee_amount, amount - fee_amount, uint64(srcChainId), uint64(destChainId), uint128(deposit_timestamp), txHash);
+    emit Release(request_id, request.to, request.amount, jaxnet_txHash);
+  }
+
+  function get_user_requests(address user) external view returns(uint[] memory) {
+    return user_requests[user];
   }
 
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
