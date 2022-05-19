@@ -13,6 +13,8 @@ contract WjaxBscBridge {
 
   address public admin;
 
+  address public auditor;
+
   uint public penalty_amount = 0;
 
   address public penalty_wallet;
@@ -20,35 +22,39 @@ contract WjaxBscBridge {
   IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
 
   struct Request {
-    uint srcChainId;
-    uint destChainId;
+    uint src_chain_id;
+    uint dest_chain_id;
     uint amount;
     uint fee_amount;
     address to;
     uint deposit_timestamp;
-    bytes32 depositHash;
+    bytes32 deposit_hash;
+    string deposit_tx_hash;
+    string release_tx_hash;
   }
 
   Request[] public requests;
 
   mapping(address => uint[]) public user_requests;
 
+  address[] public auditors;
   address[] public bridge_operators;
   mapping(address => uint) operating_limits;
 
+  mapping(bytes32 => bool) valid_deposit_hashes;
   mapping(bytes32 => bool) proccessed_deposit_hashes;
   mapping(bytes32 => bool) proccessed_tx_hashes;
 
-  event Deposit(uint indexed request_id, bytes32 indexed depositHash, address indexed to, uint amount, uint fee_amount, uint64 srcChainId, uint64 destChainId, uint128 deposit_timestamp);
+  event Deposit(uint indexed request_id, bytes32 indexed deposit_hash, address indexed to, uint amount, uint fee_amount, uint64 src_chain_id, uint64 dest_chain_id, uint128 deposit_timestamp);
   event Release(
     uint indexed request_id, 
-    bytes32 indexed depositHash, 
+    bytes32 indexed deposit_hash, 
     address indexed to, 
     uint deposited_amount, 
     uint fee_amount,
     uint released_amount, 
-    uint64 srcChainId, 
-    uint64 destChainId, 
+    uint64 src_chain_id, 
+    uint64 dest_chain_id, 
     uint128 deposit_timestamp, 
     string txHash
   );
@@ -76,6 +82,11 @@ contract WjaxBscBridge {
     _;
   }
 
+  modifier onlyAuditor() {
+    require(isAuditor(msg.sender), "Only Auditor can perform this operation.");
+    _;
+  }
+
   modifier onlyOperator() {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
     _;
@@ -85,42 +96,64 @@ contract WjaxBscBridge {
     wjax.transfer(admin, amount);
   }
 
-  function deposit(uint destChainId, uint amount) external {
+  function deposit(uint dest_chain_id, uint amount) external {
     require(amount >= minimum_fee_amount, "Minimum amount");
-    require(chainId != destChainId, "Invalid Destnation network");
+    require(chainId != dest_chain_id, "Invalid Destnation network");
     uint request_id = requests.length;
     uint fee_amount = amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
-    bytes32 depositHash = keccak256(abi.encodePacked(request_id, msg.sender, chainId, destChainId, amount, fee_amount, block.timestamp));
+    bytes32 deposit_hash = keccak256(abi.encodePacked(request_id, msg.sender, chainId, dest_chain_id, amount, fee_amount, block.timestamp));
     Request memory request = Request({
-      srcChainId: chainId,
-      destChainId: destChainId,
+      src_chain_id: chainId,
+      dest_chain_id: dest_chain_id,
       amount: amount,
       fee_amount: fee_amount,
       to: msg.sender,
       deposit_timestamp: block.timestamp,
-      depositHash: depositHash
+      deposit_hash: deposit_hash,
+      deposit_tx_hash: "",
+      release_tx_hash: ""
     });
     requests.push(request);
     wjax.transferFrom(msg.sender, address(this), amount);
-    emit Deposit(request_id, depositHash, msg.sender, amount, fee_amount, uint64(chainId), uint64(destChainId), uint128(block.timestamp));
+    emit Deposit(request_id, deposit_hash, msg.sender, amount, fee_amount, uint64(chainId), uint64(dest_chain_id), uint128(block.timestamp));
+  }
+
+
+  function add_deposit_hash(
+    uint request_id,
+    address to,
+    uint src_chain_id,
+    uint dest_chain_id,
+    uint amount,
+    uint fee_amount,
+    uint deposit_timestamp,
+    bytes32 deposit_hash,
+    string calldata txHash
+  ) external onlyAuditor {
+    require( dest_chain_id == chainId, "Incorrect destination network" );
+    require( deposit_hash == keccak256(abi.encodePacked(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_timestamp)), "Incorrect deposit hash");
+    bytes32 _txHash = keccak256(abi.encodePacked(txHash));
+    require( proccessed_deposit_hashes[deposit_hash] == false && proccessed_tx_hashes[_txHash] == false, "Already processed" );
+    valid_deposit_hashes[deposit_hash] = true;
   }
 
   function release(
     uint request_id,
     address to,
-    uint srcChainId,
-    uint destChainId,
+    uint src_chain_id,
+    uint dest_chain_id,
     uint amount,
     uint fee_amount,
     uint deposit_timestamp,
-    bytes32 depositHash,
+    bytes32 deposit_hash,
     string calldata txHash
   ) external onlyOperator {
-    require( destChainId == chainId, "Incorrect destination network" );
-    require( depositHash == keccak256(abi.encodePacked(request_id, to, srcChainId, chainId, amount, fee_amount, deposit_timestamp)), "Incorrect deposit hash");
+    require( dest_chain_id == chainId, "Incorrect destination network" );
+    require( deposit_hash == keccak256(abi.encodePacked(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_timestamp)), "Incorrect deposit hash");
     bytes32 _txHash = keccak256(abi.encodePacked(txHash));
-    require( proccessed_deposit_hashes[depositHash] == false && proccessed_tx_hashes[_txHash] == false, "Already processed" );
+    require( proccessed_deposit_hashes[deposit_hash] == false && proccessed_tx_hashes[_txHash] == false, "Already processed" );
+    require(valid_deposit_hashes[deposit_hash], "Deposit is not valid");
     wjax.transfer(to, amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
@@ -137,13 +170,39 @@ contract WjaxBscBridge {
       wjax.transfer(msg.sender, fee_amount);
     }
     operating_limits[msg.sender] -= amount;
-    proccessed_deposit_hashes[depositHash] = true;
+    proccessed_deposit_hashes[deposit_hash] = true;
     proccessed_tx_hashes[_txHash] = true;
-    emit Release(request_id, depositHash, to, amount, fee_amount, amount - fee_amount, uint64(srcChainId), uint64(destChainId), uint128(deposit_timestamp), txHash);
+    emit Release(request_id, deposit_hash, to, amount, fee_amount, amount - fee_amount, uint64(src_chain_id), uint64(dest_chain_id), uint128(deposit_timestamp), txHash);
+  }
+
+  function complete_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAuditor {
+    Request storage request = requests[request_id];
+    require(bytes(request.deposit_tx_hash).length == 0, "");
+    request.deposit_tx_hash = deposit_tx_hash;
+    request.release_tx_hash = release_tx_hash;
   }
 
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
+  }
+
+
+  function add_auditor(address operator, uint operating_limit) external onlyAdmin {
+    for(uint i = 0; i < auditors.length; i += 1) {
+      if(auditors[i] == operator)
+        revert("Already exists");
+    }
+    auditors.push(operator);
+    operating_limits[operator] = operating_limit;
+  }
+
+  function isAuditor(address operator) public view returns(bool) {
+    uint i = 0;
+    for(; i < auditors.length; i += 1) {
+      if(auditors[i] == operator)
+        return true;
+    } 
+    return false;
   }
 
   function add_bridge_operator(address operator, uint operating_limit) external onlyAdmin {
@@ -186,12 +245,12 @@ contract WjaxBscBridge {
     emit Set_Admin(_admin);
   }
 
-  function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAdmin {
+  function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     penalty_amount += amount;
     emit Add_Penalty_Amount(amount, info_hash);
   }
 
-  function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAdmin {
+  function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     require(penalty_amount >= amount, "over penalty amount");
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
