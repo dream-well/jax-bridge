@@ -41,6 +41,7 @@ contract WjaxPolygonBridge {
   mapping(address => uint[]) public user_requests;
 
   address[] public auditors;
+  address[] public verifiers;
   address[] public bridge_operators;
   mapping(address => uint) operating_limits;
   mapping(address => address) fee_wallets;
@@ -91,6 +92,11 @@ contract WjaxPolygonBridge {
     _;
   }
 
+  modifier onlyVerifier() {
+    require(isVerifier(msg.sender), "Only Verifier can perform this operation.");
+    _;
+  }
+
   modifier onlyOperator() {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
     _;
@@ -131,7 +137,7 @@ contract WjaxPolygonBridge {
     uint deposit_timestamp,
     bytes32 deposit_hash,
     string calldata txHash
-  ) external onlyAuditor {
+  ) external onlyVerifier {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     require( deposit_hash == keccak256(abi.encodePacked(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_timestamp)), "Incorrect deposit hash");
     bytes32 _txHash = keccak256(abi.encodePacked(txHash));
@@ -201,6 +207,24 @@ contract WjaxPolygonBridge {
     uint i = 0;
     for(; i < auditors.length; i += 1) {
       if(auditors[i] == auditor)
+        return true;
+    } 
+    return false;
+  }
+
+
+  function add_verifier(address verifier) external onlyAdmin {
+    for(uint i = 0; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
+        revert("Already exists");
+    }
+    verifiers.push(verifier);
+  }
+
+  function isVerifier(address verifier) public view returns(bool) {
+    uint i = 0;
+    for(; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
         return true;
     } 
     return false;
