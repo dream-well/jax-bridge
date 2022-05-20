@@ -52,6 +52,7 @@ contract JxnWjxn2Bridge {
   address[] public verifiers;
   address[] public bridge_operators;
   mapping(address => uint) operating_limits;
+  mapping(address => address) fee_wallets;
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
 
@@ -283,13 +284,14 @@ contract JxnWjxn2Bridge {
     return false;
   }
 
-  function add_bridge_operator(address operator, uint operating_limit) external onlyAdmin {
+  function add_bridge_operator(address operator, uint operating_limit, address fee_wallet) external onlyAdmin {
     for(uint i = 0; i < bridge_operators.length; i += 1) {
       if(bridge_operators[i] == operator)
         revert("Already exists");
     }
     bridge_operators.push(operator);
     operating_limits[operator] = operating_limit;
+    fee_wallets[operator] = fee_wallet;
   }
 
   function isBridgeOperator(address operator) public view returns(bool) {

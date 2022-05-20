@@ -43,6 +43,7 @@ contract WjaxEthBridge {
   address[] public auditors;
   address[] public bridge_operators;
   mapping(address => uint) operating_limits;
+  mapping(address => address) fee_wallets;
 
   mapping(bytes32 => bool) valid_deposit_hashes;
   mapping(bytes32 => bool) proccessed_deposit_hashes;
@@ -165,12 +166,12 @@ contract WjaxEthBridge {
       }
       else {
         wjax.transfer(penalty_wallet, penalty_amount);
-        wjax.transfer(msg.sender, fee_amount - penalty_amount);
+        wjax.transfer(fee_wallets[msg.sender], fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.transfer(msg.sender, fee_amount);
+      wjax.transfer(fee_wallets[msg.sender], fee_amount);
     }
     proccessed_deposit_hashes[deposit_hash] = true;
     proccessed_tx_hashes[_txHash] = true;
@@ -207,13 +208,14 @@ contract WjaxEthBridge {
     return false;
   }
 
-  function add_bridge_operator(address operator, uint operating_limit) external onlyAdmin {
+  function add_bridge_operator(address operator, uint operating_limit, address fee_wallet) external onlyAdmin {
     for(uint i = 0; i < bridge_operators.length; i += 1) {
       if(bridge_operators[i] == operator)
         revert("Already exists");
     }
     bridge_operators.push(operator);
     operating_limits[operator] = operating_limit;
+    fee_wallets[operator] = fee_wallet;
   }
 
   function isBridgeOperator(address operator) public view returns(bool) {
