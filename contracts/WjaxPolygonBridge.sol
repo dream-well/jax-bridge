@@ -5,6 +5,7 @@ pragma solidity 0.8.11;
 interface IERC20 {
   function mint(address, uint) external;
   function burn(uint) external;
+  function transfer(address, uint) external;
   function transferFrom(address, address, uint) external;
 }
 
@@ -21,7 +22,7 @@ contract WjaxPolygonBridge {
 
   address public penalty_wallet;
 
-  IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
+  IERC20 public wjax = IERC20(0x2b66837c742fcA971bF4261d6AfEB67d66E32BdD);
 
   struct Request {
     uint src_chain_id;
@@ -42,6 +43,7 @@ contract WjaxPolygonBridge {
   address[] public auditors;
   address[] public bridge_operators;
   mapping(address => uint) operating_limits;
+  mapping(address => address) fee_wallets;
 
   mapping(bytes32 => bool) valid_deposit_hashes;
   mapping(bytes32 => bool) proccessed_deposit_hashes;
@@ -161,12 +163,12 @@ contract WjaxPolygonBridge {
       }
       else {
         wjax.mint(penalty_wallet, penalty_amount);
-        wjax.mint(msg.sender, fee_amount - penalty_amount);
+        wjax.mint(fee_wallets[msg.sender], fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.mint(msg.sender, fee_amount);
+      wjax.mint(fee_wallets[msg.sender], fee_amount);
     }
     operating_limits[msg.sender] -= amount;
     proccessed_deposit_hashes[deposit_hash] = true;
@@ -204,13 +206,14 @@ contract WjaxPolygonBridge {
     return false;
   }
 
-  function add_bridge_operator(address operator, uint operating_limit) external onlyAdmin {
+  function add_bridge_operator(address operator, uint operating_limit, address fee_wallet) external onlyAdmin {
     for(uint i = 0; i < bridge_operators.length; i += 1) {
       if(bridge_operators[i] == operator)
         revert("Already exists");
     }
     bridge_operators.push(operator);
     operating_limits[operator] = operating_limit;
+    fee_wallets[operator] = fee_wallet;
   }
 
   function isBridgeOperator(address operator) public view returns(bool) {
@@ -253,4 +256,9 @@ contract WjaxPolygonBridge {
     require(penalty_amount >= amount, "over penalty amount");
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
+
+  function withdrawByAdmin(address token, uint amount) external onlyAdmin {
+      IERC20(token).transfer(msg.sender, amount);
+  }
+
 }

@@ -4,7 +4,7 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-contract WjaxEthBridge {
+contract WjaxBscBridge {
 
   uint chainId;
   
@@ -248,4 +248,9 @@ contract WjaxEthBridge {
     require(penalty_amount >= amount, "over penalty amount");
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
+
+  function withdrawByAdmin(address token, uint amount) external onlyAdmin {
+      IERC20(token).transfer(msg.sender, amount);
+  }
+
 }
