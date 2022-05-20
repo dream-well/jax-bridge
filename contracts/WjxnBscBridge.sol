@@ -7,12 +7,12 @@ interface IERC20 {
   function transferFrom(address, address, uint) external;
 }
 
-contract WjaxBscBridge {
+contract WjxnBscBridge {
 
   uint chainId;
   
   uint public fee_percent = 5e5; // 0.5 %
-  uint public minimum_fee_amount = 50; // 50 wjax
+  uint public minimum_fee_amount = 50; // 50 wjxn
 
   address public admin;
 
@@ -20,7 +20,7 @@ contract WjaxBscBridge {
 
   address public penalty_wallet;
 
-  IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
+  IERC20 public wjxn = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
 
   struct Request {
     uint src_chain_id;
@@ -119,7 +119,7 @@ contract WjaxBscBridge {
       release_tx_hash: ""
     });
     requests.push(request);
-    wjax.transferFrom(msg.sender, address(this), amount);
+    wjxn.transferFrom(msg.sender, address(this), amount);
     emit Deposit(request_id, deposit_hash, msg.sender, amount, fee_amount, uint64(chainId), uint64(dest_chain_id), uint128(block.timestamp));
   }
 
@@ -160,20 +160,20 @@ contract WjaxBscBridge {
     require(valid_deposit_hashes[deposit_hash], "Deposit is not valid");
     require(operating_limits[msg.sender] >= amount, "Out of operating limit");
     operating_limits[msg.sender] -= amount;
-    wjax.transfer(to, amount - fee_amount);
+    wjxn.transfer(to, amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
-        wjax.transfer(penalty_wallet, fee_amount);
+        wjxn.transfer(penalty_wallet, fee_amount);
         penalty_amount -= fee_amount;
       }
       else {
-        wjax.transfer(penalty_wallet, penalty_amount);
-        wjax.transfer(fee_wallets[msg.sender], fee_amount - penalty_amount);
+        wjxn.transfer(penalty_wallet, penalty_amount);
+        wjxn.transfer(fee_wallets[msg.sender], fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.transfer(fee_wallets[msg.sender], fee_amount);
+      wjxn.transfer(fee_wallets[msg.sender], fee_amount);
     }
     proccessed_deposit_hashes[deposit_hash] = true;
     proccessed_tx_hashes[_txHash] = true;
