@@ -33,7 +33,8 @@ contract WjaxPolygonBridge {
     uint deposit_timestamp;
     bytes32 deposit_hash;
     string deposit_tx_hash;
-    string release_tx_hash;
+    string deposit_tx_link;
+    string release_tx_link;
   }
 
   Request[] public requests;
@@ -64,8 +65,8 @@ contract WjaxPolygonBridge {
     string txHash
   );
   event Add_Deposit_Hash(uint request_id, string deposit_tx_hash);
-  event Complete_Release_Tx_Hash(uint request_id, string deposit_tx_hash, string release_tx_hash);
-  event Update_Release_Tx_Hash(uint request_id, string deposit_tx_hash, string release_tx_hash);
+  event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
+  event Update_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Reject_Request(uint request_id);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Add_Penalty_Amount(uint amount, bytes32 info_hash);
@@ -117,7 +118,8 @@ contract WjaxPolygonBridge {
       deposit_timestamp: block.timestamp,
       deposit_hash: deposit_hash,
       deposit_tx_hash: "",
-      release_tx_hash: ""
+      deposit_tx_link: "",
+      release_tx_link: ""
     });
     requests.push(request);
     wjax.transferFrom(msg.sender, address(this), amount);
@@ -184,20 +186,20 @@ contract WjaxPolygonBridge {
     emit Release(request_id, deposit_hash, to, amount, fee_amount, amount - fee_amount, uint64(src_chain_id), uint64(dest_chain_id), uint128(deposit_timestamp), txHash);
   }
 
-  function complete_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAuditor {
+  function complete_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAuditor {
     Request storage request = requests[request_id];
-    require(bytes(request.deposit_tx_hash).length == 0, "");
-    require(bytes(request.release_tx_hash).length == 0, "");
-    request.deposit_tx_hash = deposit_tx_hash;
-    request.release_tx_hash = release_tx_hash;
-    emit Complete_Release_Tx_Hash(request_id, deposit_tx_hash, release_tx_hash);
+    require(bytes(request.deposit_tx_link).length == 0, "");
+    require(bytes(request.release_tx_link).length == 0, "");
+    request.deposit_tx_link = deposit_tx_link;
+    request.release_tx_link = release_tx_link;
+    emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 
-  function update_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAdmin {
+  function update_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAdmin {
     Request storage request = requests[request_id];
-    request.deposit_tx_hash = deposit_tx_hash;
-    request.release_tx_hash = release_tx_hash;
-    emit Update_Release_Tx_Hash(request_id, deposit_tx_hash, release_tx_hash);
+    request.deposit_tx_link = deposit_tx_link;
+    request.release_tx_link = release_tx_link;
+    emit Update_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 
   function add_auditor(address auditor) external onlyAdmin {

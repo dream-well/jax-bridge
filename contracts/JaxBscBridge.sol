@@ -37,7 +37,8 @@ contract Jax2BscBridge {
     RequestStatus status;
     string from;
     string deposit_tx_hash;
-    string release_tx_hash;
+    string deposit_tx_link;
+    string release_tx_link;
   }
 
   string[] public deposit_addresses;
@@ -63,16 +64,9 @@ contract Jax2BscBridge {
   event Reject_Request(uint request_id);
   event Release(uint request_id, address from, uint amount);
   event Add_Deposit_Hash(uint request_id, string deposit_tx_hash);
-  event Complete_Release_Tx_Hash(uint request_id, string release_tx_hash);
-  event Update_Release_Tx_Hash(uint request_id, string release_tx_hash);
+  event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
+  event Update_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
-  event Add_Penalty_Amount(uint amount, bytes32 info_hash);
-  event Subtract_Penalty_Amount(uint amount, bytes32 info_hash);
-  event Set_Operating_Limit(address operator, uint operating_limit);
-  event Free_Deposit_Address(uint deposit_address_id);
-  event Set_Penalty_Wallet(address wallet);
-  event Set_Admin(address admin);
-  event Delete_Deposit_Addresses(uint[] ids);
   event Add_Penalty_Amount(uint amount, bytes32 info_hash);
   event Subtract_Penalty_Amount(uint amount, bytes32 info_hash);
 
@@ -225,17 +219,21 @@ contract Jax2BscBridge {
     emit Release(request_id, request.to, request.amount - fee_amount);
   }
 
-  function complete_release_tx_hash(uint request_id, string calldata release_tx_hash) external onlyAuditor {
+
+  function complete_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAuditor {
     Request storage request = requests[request_id];
-    require(bytes(request.release_tx_hash).length == 0, "");
-    request.release_tx_hash = release_tx_hash;
-    emit Complete_Release_Tx_Hash(request_id, release_tx_hash);
+    require(bytes(request.deposit_tx_link).length == 0, "");
+    require(bytes(request.release_tx_link).length == 0, "");
+    request.deposit_tx_link = deposit_tx_link;
+    request.release_tx_link = release_tx_link;
+    emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 
-  function update_release_tx_hash(uint request_id, string calldata release_tx_hash) external onlyAdmin {
+  function update_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAdmin {
     Request storage request = requests[request_id];
-    request.release_tx_hash = release_tx_hash;
-    emit Update_Release_Tx_Hash(request_id, release_tx_hash);
+    request.deposit_tx_link = deposit_tx_link;
+    request.release_tx_link = release_tx_link;
+    emit Update_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 
   function get_user_requests(address user) external view returns(uint[] memory) {
@@ -337,7 +335,6 @@ contract Jax2BscBridge {
         if(requests[request_id].status == RequestStatus.Init){
           requests[request_id].status = RequestStatus.Expired;
           deposit_address_locktimes[i] = 0;
-          emit Free_Deposit_Address(i);
         }
       }
     }
@@ -350,7 +347,6 @@ contract Jax2BscBridge {
       require(deposit_address_locktimes[i] == 0, "Active deposit address");
       deposit_address_deleted[id] = true;
     }
-    emit Delete_Deposit_Addresses(ids);
   }
 
   function set_penalty_wallet(address _penalty_wallet) external onlyAdmin {

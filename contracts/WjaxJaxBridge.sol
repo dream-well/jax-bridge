@@ -36,7 +36,8 @@ contract Wjax2JaxBridge {
     RequestStatus status;
     string to;
     string deposit_tx_hash;
-    string release_tx_hash;
+    string deposit_tx_link;
+    string release_tx_link;
     string jaxnet_tx_hash;
   }
 
@@ -55,8 +56,8 @@ contract Wjax2JaxBridge {
   event Deposit(uint request_id, uint shard_id, uint amount, uint fee_amount, address from, string to);
   event Release(uint request_id, string to, uint amount, string txHash);
   event Add_Deposit_Hash(uint request_id, string deposit_tx_hash);
-  event Complete_Release_Tx_Hash(uint request_id, string release_tx_hash);
-  event Update_Release_Tx_Hash(uint request_id, string deposit_tx_hash, string release_tx_hash);
+  event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
+  event Update_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Add_Penalty_Amount(uint amount, bytes32 info_hash);
   event Subtract_Penalty_Amount(uint amount, bytes32 info_hash);
@@ -165,19 +166,22 @@ contract Wjax2JaxBridge {
     emit Release(request_id, request.to, request.amount, jaxnet_tx_hash);
   }
 
-  function complete_release_tx_hash(uint request_id, string calldata release_tx_hash) external onlyAuditor {
+  function complete_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAuditor {
     Request storage request = requests[request_id];
-    require(bytes(request.release_tx_hash).length == 0, "");
-    request.release_tx_hash = release_tx_hash;
-    emit Complete_Release_Tx_Hash(request_id, release_tx_hash);
+    require(bytes(request.deposit_tx_link).length == 0, "");
+    require(bytes(request.release_tx_link).length == 0, "");
+    request.deposit_tx_link = deposit_tx_link;
+    request.release_tx_link = release_tx_link;
+    emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 
-  function update_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAdmin {
+  function update_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAdmin {
     Request storage request = requests[request_id];
-    request.deposit_tx_hash = deposit_tx_hash;
-    request.release_tx_hash = release_tx_hash;
-    emit Update_Release_Tx_Hash(request_id, deposit_tx_hash, release_tx_hash);
+    request.deposit_tx_link = deposit_tx_link;
+    request.release_tx_link = release_tx_link;
+    emit Update_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
+
   function get_user_requests(address user) external view returns(uint[] memory) {
     return user_requests[user];
   }
