@@ -156,20 +156,21 @@ contract WjaxEthBridge {
     require(valid_deposit_hashes[deposit_hash], "Deposit is not valid");
     require(operating_limits[msg.sender] >= amount, "Out of operating limit");
     operating_limits[msg.sender] -= amount;
-    wjax.mint(to, amount - fee_amount);
+    wjax.mint(address(this), amount);
+    wjax.transfer(to, amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
-        wjax.mint(penalty_wallet, fee_amount);
+        wjax.transfer(penalty_wallet, fee_amount);
         penalty_amount -= fee_amount;
       }
       else {
-        wjax.mint(penalty_wallet, penalty_amount);
-        wjax.mint(msg.sender, fee_amount - penalty_amount);
+        wjax.transfer(penalty_wallet, penalty_amount);
+        wjax.transfer(msg.sender, fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.mint(msg.sender, fee_amount);
+      wjax.transfer(msg.sender, fee_amount);
     }
     proccessed_deposit_hashes[deposit_hash] = true;
     proccessed_tx_hashes[_txHash] = true;

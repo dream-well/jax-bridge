@@ -3,8 +3,9 @@
 pragma solidity 0.8.11;
 
 interface IWJAX {
-  function burnFrom(address, uint) external;    
-  function mint(address, uint) external returns (bool);
+  function burn(uint) external;
+  function transfer(address, uint) external;
+  function transferFrom(address, address, uint) external;
 }
 
 contract Wjax2JaxBridge {
@@ -33,14 +34,17 @@ contract Wjax2JaxBridge {
     address from;
     RequestStatus status;
     string to;
-    string local_txHash;
-    string jaxnet_txHash;
+    string deposit_tx_hash;
+    string release_tx_hash;
+    string jaxnet_tx_hash;
   }
 
   Request[] public requests;
 
   mapping(address => uint[]) public user_requests;
 
+  address[] public auditors;
+  address[] public verifiers;
   address[] public bridge_operators;
   mapping(address => uint) operating_limits;
 
@@ -70,6 +74,15 @@ contract Wjax2JaxBridge {
     _;
   }
 
+  modifier onlyAuditor() {
+    require(isAuditor(msg.sender), "Only Auditor can perform this operation.");
+    _;
+  }
+
+  modifier onlyVerifier() {
+    require(isVerifier(msg.sender), "Only Verifier can perform this operation.");
+    _;
+  }
 
   modifier onlyOperator() {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
@@ -92,8 +105,14 @@ contract Wjax2JaxBridge {
     request.created_at = block.timestamp;
     requests.push(request);
     user_requests[msg.sender].push(request_id);
-    wjax.burnFrom(msg.sender, amount);
+    wjax.transferFrom(msg.sender, address(this), amount);
     emit Deposit(request_id, shard_id, amount, fee_amount, msg.sender, to);
+  }
+
+  function add_deposit_hash(uint request_id, string calldata deposit_tx_hash) external onlyVerifier {
+    Request storage request = requests[request_id];
+    require(bytes(request.deposit_tx_hash).length == 0, "");
+    request.deposit_tx_hash = deposit_tx_hash;
   }
 
   function release(
@@ -102,12 +121,12 @@ contract Wjax2JaxBridge {
     uint amount,
     address from,
     string calldata to,
-    string calldata local_txHash,
-    string calldata jaxnet_txHash
+    string calldata deposit_tx_hash,
+    string calldata jaxnet_tx_hash
   ) external onlyOperator {
     Request storage request = requests[request_id];
-    bytes32 jaxnet_txd_hash = keccak256(abi.encodePacked(jaxnet_txHash));
-    bytes32 local_txd_hash = keccak256(abi.encodePacked(local_txHash));
+    bytes32 jaxnet_txd_hash = keccak256(abi.encodePacked(jaxnet_tx_hash));
+    bytes32 local_txd_hash = keccak256(abi.encodePacked(deposit_tx_hash));
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
     require(request.amount == amount, "Incorrect amount");
     require(request.status == RequestStatus.Init, "Invalid status");
@@ -116,31 +135,44 @@ contract Wjax2JaxBridge {
     require(keccak256(abi.encodePacked(request.to)) == keccak256(abi.encodePacked(to)), "Destination address mismatch");
     require(proccessed_txd_hashes[jaxnet_txd_hash] == false, "Jaxnet TxHash already used");
     require(proccessed_txd_hashes[local_txd_hash] == false, "Local TxHash already used");
-    request.jaxnet_txHash = jaxnet_txHash;
-    request.local_txHash = local_txHash;
+    require(keccak256(abi.encodePacked(request.deposit_tx_hash)) == keccak256(abi.encodePacked(deposit_tx_hash)), "Deposit tx hash mismatch");
+    request.jaxnet_tx_hash = jaxnet_tx_hash;
     request.released_at = block.timestamp;
     request.status = RequestStatus.Released;
     proccessed_txd_hashes[jaxnet_txd_hash] = true;
     proccessed_txd_hashes[local_txd_hash] = true;
     uint fee_amount = request.fee_amount;
+    wjax.burn(amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
-        wjax.mint(penalty_wallet, fee_amount);
+        wjax.transfer(penalty_wallet, fee_amount);
         penalty_amount -= fee_amount;
       }
       else {
-        wjax.mint(penalty_wallet, penalty_amount);
-        wjax.mint(msg.sender, fee_amount - penalty_amount);
+        wjax.transfer(penalty_wallet, penalty_amount);
+        wjax.transfer(msg.sender, fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.mint(msg.sender, fee_amount);
+      wjax.transfer(msg.sender, fee_amount);
     }
     operating_limits[msg.sender] -= amount;
-    emit Release(request_id, request.to, request.amount, jaxnet_txHash);
+    emit Release(request_id, request.to, request.amount, jaxnet_tx_hash);
   }
 
+  function complete_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAuditor {
+    Request storage request = requests[request_id];
+    require(bytes(request.deposit_tx_hash).length == 0, "");
+    request.deposit_tx_hash = deposit_tx_hash;
+    request.release_tx_hash = release_tx_hash;
+  }
+
+  function update_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAdmin {
+    Request storage request = requests[request_id];
+    request.deposit_tx_hash = deposit_tx_hash;
+    request.release_tx_hash = release_tx_hash;
+  }
   function get_user_requests(address user) external view returns(uint[] memory) {
     return user_requests[user];
   }
@@ -152,6 +184,63 @@ contract Wjax2JaxBridge {
     }
     bridge_operators.push(operator);
     operating_limits[operator] = operating_limit;
+  }
+
+  function add_auditor(address auditor) external onlyAdmin {
+    for(uint i = 0; i < auditors.length; i += 1) {
+      if(auditors[i] == auditor)
+        revert("Already exists");
+    }
+    auditors.push(auditor);
+  }
+
+  function delete_auditor(address auditor) external onlyAdmin {
+    uint i = 0;
+    for(; i < auditors.length; i += 1) {
+      if(auditors[i] == auditor)
+        break;
+    }
+    require(i < auditors.length, "Not an auditor");
+    auditors[i] = auditors[auditors.length - 1];
+    auditors.pop();
+  }
+
+  function isAuditor(address auditor) public view returns(bool) {
+    uint i = 0;
+    for(; i < auditors.length; i += 1) {
+      if(auditors[i] == auditor)
+        return true;
+    } 
+    return false;
+  }
+
+
+  function add_verifier(address verifier) external onlyAdmin {
+    for(uint i = 0; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
+        revert("Already exists");
+    }
+    verifiers.push(verifier);
+  }
+
+  function delete_verifier(address verifier) external onlyAdmin {
+    uint i = 0;
+    for(; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
+        break;
+    }
+    require(i < verifiers.length, "Not an verifier");
+    verifiers[i] = verifiers[verifiers.length - 1];
+    verifiers.pop();
+  }
+
+  function isVerifier(address verifier) public view returns(bool) {
+    uint i = 0;
+    for(; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
+        return true;
+    } 
+    return false;
   }
 
   function isBridgeOperator(address operator) public view returns(bool) {
