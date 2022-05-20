@@ -66,6 +66,8 @@ contract WjaxBscBridge {
   event Update_Release_Tx_Hash(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Reject_Request(uint request_id);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
+  event Add_Penalty_Amount(uint amount, bytes32 info_hash);
+  event Subtract_Penalty_Amount(uint amount, bytes32 info_hash);
 
   constructor() {
     admin = msg.sender;
@@ -291,11 +293,14 @@ contract WjaxBscBridge {
 
   function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     penalty_amount += amount;
+    emit Add_Penalty_Amount(amount, info_hash);
+    emit Add_Penalty_Amount(amount, info_hash);
   }
 
   function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     require(penalty_amount >= amount, "over penalty amount");
     penalty_amount -= amount;
+    emit Subtract_Penalty_Amount(amount, info_hash);
   }
 
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {

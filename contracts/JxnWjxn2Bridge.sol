@@ -65,6 +65,8 @@ contract JxnWjxn2Bridge {
   event Complete_Release_Tx_Hash(uint request_id, string release_tx_hash);
   event Update_Release_Tx_Hash(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
+  event Add_Penalty_Amount(uint amount, bytes32 info_hash);
+  event Subtract_Penalty_Amount(uint amount, bytes32 info_hash);
   event Set_Operating_Limit(address operator, uint operating_limit);
   event Free_Deposit_Address(uint deposit_address_id);
   event Set_Penalty_Wallet(address wallet);
@@ -367,11 +369,13 @@ contract JxnWjxn2Bridge {
   
   function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     penalty_amount += amount;
+    emit Add_Penalty_Amount(amount, info_hash);
   }
 
   function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     require(penalty_amount >= amount, "over penalty amount");
     penalty_amount -= amount;
+    emit Subtract_Penalty_Amount(amount, info_hash);
   }
   
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
