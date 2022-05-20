@@ -57,7 +57,7 @@ module.exports = {
       accounts: [deployerWalletPrivateKey],
     },
     polygontestnet: {
-      url: `https://rpc-mumbai.maticvigil.com/`,
+      url: `https://speedy-nodes-nyc.moralis.io/cb02b6b8ff2cdd26f1db08a4/polygon/mumbai`,
       accounts: [deployerWalletPrivateKey],
     },
     avalancheTestnet: {
@@ -75,7 +75,7 @@ module.exports = {
     }
   },
   etherscan: {
-    apiKey: bscscanAPIkey
+    apiKey: polygonscanAPIkey
   },
   paths: {
     sources: "./contracts",

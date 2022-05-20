@@ -3,9 +3,8 @@
 pragma solidity 0.8.11;
 
 interface IWJAX {
-  function burnFrom(address account, uint amount) external;    
-  function transfer(address recipient, uint256 amount) external returns (bool);
-  event Transfer(address indexed from, address indexed to, uint256 value);
+  function burnFrom(address, uint) external;    
+  function mint(address, uint) external returns (bool);
 }
 
 contract Wjax2JaxBridge {
@@ -126,17 +125,17 @@ contract Wjax2JaxBridge {
     uint fee_amount = request.fee_amount;
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
-        wjax.transfer(penalty_wallet, fee_amount);
+        wjax.mint(penalty_wallet, fee_amount);
         penalty_amount -= fee_amount;
       }
       else {
-        wjax.transfer(penalty_wallet, penalty_amount);
-        wjax.transfer(msg.sender, fee_amount - penalty_amount);
+        wjax.mint(penalty_wallet, penalty_amount);
+        wjax.mint(msg.sender, fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.transfer(msg.sender, fee_amount);
+      wjax.mint(msg.sender, fee_amount);
     }
     operating_limits[msg.sender] -= amount;
     emit Release(request_id, request.to, request.amount, jaxnet_txHash);

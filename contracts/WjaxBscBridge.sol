@@ -4,7 +4,7 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-contract WjaxBscBridge {
+contract WjaxEthBridge {
 
   uint chainId;
   
@@ -12,8 +12,6 @@ contract WjaxBscBridge {
   uint public minimum_fee_amount = 50; // 50 wjax
 
   address public admin;
-
-  address public auditor;
 
   uint public penalty_amount = 0;
 
@@ -90,10 +88,6 @@ contract WjaxBscBridge {
   modifier onlyOperator() {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
     _;
-  }
-
-  function withdraw(uint amount) external onlyAdmin {
-    wjax.transfer(admin, amount);
   }
 
   function deposit(uint dest_chain_id, uint amount) external {
@@ -182,24 +176,24 @@ contract WjaxBscBridge {
     request.release_tx_hash = release_tx_hash;
   }
 
-  function withdrawByAdmin(address token, uint amount) external onlyAdmin {
-      IERC20(token).transfer(msg.sender, amount);
+  function update_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAdmin {
+    Request storage request = requests[request_id];
+    request.deposit_tx_hash = deposit_tx_hash;
+    request.release_tx_hash = release_tx_hash;
   }
 
-
-  function add_auditor(address operator, uint operating_limit) external onlyAdmin {
+  function add_auditor(address auditor) external onlyAdmin {
     for(uint i = 0; i < auditors.length; i += 1) {
-      if(auditors[i] == operator)
+      if(auditors[i] == auditor)
         revert("Already exists");
     }
-    auditors.push(operator);
-    operating_limits[operator] = operating_limit;
+    auditors.push(auditor);
   }
 
-  function isAuditor(address operator) public view returns(bool) {
+  function isAuditor(address auditor) public view returns(bool) {
     uint i = 0;
     for(; i < auditors.length; i += 1) {
-      if(auditors[i] == operator)
+      if(auditors[i] == auditor)
         return true;
     } 
     return false;
