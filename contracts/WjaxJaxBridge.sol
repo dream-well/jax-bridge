@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.11;
 
-interface IWJAX {
+interface IERC20 {
   function mint(address, uint) external;
   function burn(uint) external;
   function transfer(address, uint) external;
@@ -22,7 +22,7 @@ contract Wjax2JaxBridge {
 
   address public penalty_wallet;
 
-  IWJAX public wjax = IWJAX(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74); 
+  IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74); 
 
   enum RequestStatus {Init, Released}
 
@@ -286,7 +286,7 @@ contract Wjax2JaxBridge {
     require(penalty_amount >= amount, "over penalty amount");
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
-  
+
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
   }
