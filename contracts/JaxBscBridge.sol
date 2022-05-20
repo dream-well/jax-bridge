@@ -170,7 +170,7 @@ contract Jax2BscBridge {
     request.deposit_tx_hash = deposit_tx_hash;
   }
 
-  function reject_request(uint request_id) external onlyOperator {
+  function reject_request(uint request_id) external onlyVerifier {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Init || request.status == RequestStatus.Proved, "Invalid status");
     request.status = RequestStatus.Rejected;
