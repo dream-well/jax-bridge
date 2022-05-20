@@ -298,7 +298,6 @@ contract WjaxBscBridge {
   function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     penalty_amount += amount;
     emit Add_Penalty_Amount(amount, info_hash);
-    emit Add_Penalty_Amount(amount, info_hash);
   }
 
   function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
