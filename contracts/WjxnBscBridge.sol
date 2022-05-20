@@ -256,8 +256,7 @@ contract WjxnBscBridge {
         revert("Already exists");
     }
     bridge_operators.push(operator);
-     operating_limits[operator] = operating_limit;
-    fee_wallets[operator] = fee_wallet;
+    operating_limits[operator] = operating_limit;
     fee_wallets[operator] = fee_wallet;
   }
 
@@ -272,8 +271,7 @@ contract WjxnBscBridge {
 
   function set_operating_limit(address operator, uint operating_limit) external onlyAdmin {
     require(isBridgeOperator(operator), "Not a bridge operator");
-     operating_limits[operator] = operating_limit;
-    fee_wallets[operator] = fee_wallet;
+    operating_limits[operator] = operating_limit;
     emit Set_Operating_Limit(operator, operating_limit);
   }
 
