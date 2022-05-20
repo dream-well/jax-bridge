@@ -69,6 +69,7 @@ contract Jax2BscBridge {
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Add_Penalty_Amount(uint amount, bytes32 info_hash);
   event Subtract_Penalty_Amount(uint amount, bytes32 info_hash);
+  event Withdraw_By_Admin(address token, uint amount);
 
   constructor() {
     admin = msg.sender;
@@ -378,6 +379,7 @@ contract Jax2BscBridge {
   
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
+      emit Withdraw_By_Admin(token, amount);
   }
 
 }

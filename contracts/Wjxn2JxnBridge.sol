@@ -61,6 +61,7 @@ contract Wjxn2JxnBridge {
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Add_Penalty_Amount(uint amount, bytes32 info_hash);
   event Subtract_Penalty_Amount(uint amount, bytes32 info_hash);
+  event Withdraw_By_Admin(address token, uint amount);
 
 
   constructor() {
@@ -184,6 +185,7 @@ contract Wjxn2JxnBridge {
 
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
+      emit Withdraw_By_Admin(token, amount);
   }
 
   function add_auditor(address auditor) external onlyAdmin {
@@ -290,5 +292,10 @@ contract Wjxn2JxnBridge {
     require(penalty_amount >= amount, "over penalty amount");
     penalty_amount -= amount;
     emit Subtract_Penalty_Amount(amount, info_hash);
+  }
+  
+  function withdrawByAdmin(address token, uint amount) external onlyAdmin {
+      IERC20(token).transfer(msg.sender, amount);
+      emit Withdraw_By_Admin(token, amount);
   }
 }
