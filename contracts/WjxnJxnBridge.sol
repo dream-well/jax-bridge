@@ -2,17 +2,14 @@
 
 pragma solidity 0.8.11;
 
-interface IWJAX {
-  function burnFrom(address, uint) external;    
-  function mint(address, uint) external returns (bool);
-}
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-contract Wjax2JaxBridge {
+contract Wjxn2JxnBridge {
 
   uint chainId;
   
   uint public fee_percent = 5e5; // 0.5 %
-  uint public minimum_fee_amount = 50; // 50 wjax
+  uint public minimum_fee_amount = 50; // 50 wjxn
 
   address public admin;
 
@@ -20,12 +17,12 @@ contract Wjax2JaxBridge {
 
   address public penalty_wallet;
 
-  IWJAX public wjax = IWJAX(0xe578Feb7B106530A6086C22A2D469aD83cA008f4); 
+  IERC20 public wjxn = IERC20(0xBC04b1cEEE41760CBd84d3D58Db57a13c95B8107); 
+
 
   enum RequestStatus {Init, Released}
 
   struct Request {
-    uint shard_id;
     uint amount;
     uint fee_amount;
     uint created_at;
@@ -46,7 +43,7 @@ contract Wjax2JaxBridge {
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
 
-  event Prove_Request(uint request_id, uint shard_id, uint amount, uint fee_amount, address from, string to);
+  event Deposit(uint request_id, uint amount, uint fee_amount, address from, string to);
   event Release(uint request_id, string to, uint amount, string txHash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Set_Operating_Limit(address operator, uint operating_limit);
@@ -76,13 +73,19 @@ contract Wjax2JaxBridge {
     _;
   }
 
-  function prove_request(uint shard_id, uint amount, string calldata to) external 
+  function deposit(uint amount) external onlyAdmin {
+    wjxn.transferFrom(admin, address(this), amount);
+  }
+
+  function withdraw(uint amount) external onlyAdmin {
+    wjxn.transfer(admin, amount);
+  }
+
+  function deposit(uint amount, string calldata to) external 
   {
-    require(shard_id >= 1 && shard_id <= 3, "Invalid shard id");
     require(amount > minimum_fee_amount, "Below minimum amount");
     uint request_id = requests.length;
     Request memory request;
-    request.shard_id = shard_id;
     uint fee_amount = request.amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
     request.amount = amount - fee_amount;
@@ -92,13 +95,12 @@ contract Wjax2JaxBridge {
     request.created_at = block.timestamp;
     requests.push(request);
     user_requests[msg.sender].push(request_id);
-    wjax.burnFrom(msg.sender, amount);
-    emit Prove_Request(request_id, shard_id, amount, fee_amount, msg.sender, to);
+    wjxn.transferFrom(msg.sender, address(this), amount);
+    emit Deposit(request_id, amount, fee_amount, msg.sender, to);
   }
 
   function release(
     uint request_id,
-    uint shard_id,
     uint amount,
     address from,
     string calldata to,
@@ -112,7 +114,6 @@ contract Wjax2JaxBridge {
     require(request.amount == amount, "Incorrect amount");
     require(request.status == RequestStatus.Init, "Invalid status");
     require(request.from == from, "Invalid sender address");
-    require(request.shard_id == shard_id, "Invalid shard id");
     require(keccak256(abi.encodePacked(request.to)) == keccak256(abi.encodePacked(to)), "Destination address mismatch");
     require(proccessed_txd_hashes[jaxnet_txd_hash] == false, "Jaxnet TxHash already used");
     require(proccessed_txd_hashes[local_txd_hash] == false, "Local TxHash already used");
@@ -125,17 +126,17 @@ contract Wjax2JaxBridge {
     uint fee_amount = request.fee_amount;
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
-        wjax.mint(penalty_wallet, fee_amount);
+        wjxn.transfer(penalty_wallet, fee_amount);
         penalty_amount -= fee_amount;
       }
       else {
-        wjax.mint(penalty_wallet, penalty_amount);
-        wjax.mint(msg.sender, fee_amount - penalty_amount);
+        wjxn.transfer(penalty_wallet, penalty_amount);
+        wjxn.transfer(msg.sender, fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.mint(msg.sender, fee_amount);
+      wjxn.transfer(msg.sender, fee_amount);
     }
     operating_limits[msg.sender] -= amount;
     emit Release(request_id, request.to, request.amount, jaxnet_txHash);
@@ -143,6 +144,10 @@ contract Wjax2JaxBridge {
 
   function get_user_requests(address user) external view returns(uint[] memory) {
     return user_requests[user];
+  }
+
+  function withdrawByAdmin(address token, uint amount) external onlyAdmin {
+      IERC20(token).transfer(msg.sender, amount);
   }
 
   function add_bridge_operator(address operator, uint operating_limit) external onlyAdmin {

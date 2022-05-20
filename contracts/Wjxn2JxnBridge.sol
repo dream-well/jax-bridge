@@ -2,14 +2,18 @@
 
 pragma solidity 0.8.11;
 
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
+interface IERC20 {
+  function burn(uint) external;
+  function transfer(address, uint) external;
+  function transferFrom(address, address, uint) external;
+}
 
 contract Wjxn2JxnBridge {
 
   uint chainId;
   
   uint public fee_percent = 5e5; // 0.5 %
-  uint public minimum_fee_amount = 50; // 50 wjxn
+  uint public minimum_fee_amount = 50; // 50 wjxn2
 
   address public admin;
 
@@ -17,7 +21,7 @@ contract Wjxn2JxnBridge {
 
   address public penalty_wallet;
 
-  IERC20 public wjxn = IERC20(0xBC04b1cEEE41760CBd84d3D58Db57a13c95B8107); 
+  IERC20 public wjxn2 = IERC20(0xe3345c59ECd8B9C157Dd182BA9500aace899AD31); 
 
 
   enum RequestStatus {Init, Released}
@@ -43,7 +47,7 @@ contract Wjxn2JxnBridge {
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
 
-  event Prove_Request(uint request_id, uint amount, uint fee_amount, address from, string to);
+  event Deposit(uint request_id, uint amount, uint fee_amount, address from, string to);
   event Release(uint request_id, string to, uint amount, string txHash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Set_Operating_Limit(address operator, uint operating_limit);
@@ -73,15 +77,7 @@ contract Wjxn2JxnBridge {
     _;
   }
 
-  function deposit(uint amount) external onlyAdmin {
-    wjxn.transferFrom(admin, address(this), amount);
-  }
-
-  function withdraw(uint amount) external onlyAdmin {
-    wjxn.transfer(admin, amount);
-  }
-
-  function prove_request(uint amount, string calldata to) external 
+  function deposit(uint amount, string calldata to) external 
   {
     require(amount > minimum_fee_amount, "Below minimum amount");
     uint request_id = requests.length;
@@ -95,8 +91,8 @@ contract Wjxn2JxnBridge {
     request.created_at = block.timestamp;
     requests.push(request);
     user_requests[msg.sender].push(request_id);
-    wjxn.transferFrom(msg.sender, address(this), amount);
-    emit Prove_Request(request_id, amount, fee_amount, msg.sender, to);
+    wjxn2.transferFrom(msg.sender, address(this), amount);
+    emit Deposit(request_id, amount, fee_amount, msg.sender, to);
   }
 
   function release(
@@ -126,18 +122,19 @@ contract Wjxn2JxnBridge {
     uint fee_amount = request.fee_amount;
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
-        wjxn.transfer(penalty_wallet, fee_amount);
+        wjxn2.transfer(penalty_wallet, fee_amount);
         penalty_amount -= fee_amount;
       }
       else {
-        wjxn.transfer(penalty_wallet, penalty_amount);
-        wjxn.transfer(msg.sender, fee_amount - penalty_amount);
+        wjxn2.transfer(penalty_wallet, penalty_amount);
+        wjxn2.transfer(msg.sender, fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjxn.transfer(msg.sender, fee_amount);
+      wjxn2.transfer(msg.sender, fee_amount);
     }
+    wjxn2.burn(amount - fee_amount);
     operating_limits[msg.sender] -= amount;
     emit Release(request_id, request.to, request.amount, jaxnet_txHash);
   }

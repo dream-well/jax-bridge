@@ -154,6 +154,8 @@ contract WjaxEthBridge {
     bytes32 _txHash = keccak256(abi.encodePacked(txHash));
     require( proccessed_deposit_hashes[deposit_hash] == false && proccessed_tx_hashes[_txHash] == false, "Already processed" );
     require(valid_deposit_hashes[deposit_hash], "Deposit is not valid");
+    require(operating_limits[msg.sender] >= amount, "Out of operating limit");
+    operating_limits[msg.sender] -= amount;
     wjax.mint(to, amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
@@ -169,7 +171,6 @@ contract WjaxEthBridge {
     else {
       wjax.mint(msg.sender, fee_amount);
     }
-    operating_limits[msg.sender] -= amount;
     proccessed_deposit_hashes[deposit_hash] = true;
     proccessed_tx_hashes[_txHash] = true;
     emit Release(request_id, deposit_hash, to, amount, fee_amount, amount - fee_amount, uint64(src_chain_id), uint64(dest_chain_id), uint128(deposit_timestamp), txHash);

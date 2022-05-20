@@ -158,6 +158,8 @@ contract WjaxBscBridge {
     bytes32 _txHash = keccak256(abi.encodePacked(txHash));
     require( proccessed_deposit_hashes[deposit_hash] == false && proccessed_tx_hashes[_txHash] == false, "Already processed" );
     require(valid_deposit_hashes[deposit_hash], "Deposit is not valid");
+    require(operating_limits[msg.sender] >= amount, "Out of operating limit");
+    operating_limits[msg.sender] -= amount;
     wjax.transfer(to, amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
