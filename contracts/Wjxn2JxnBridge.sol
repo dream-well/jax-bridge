@@ -278,12 +278,12 @@ contract Wjxn2JxnBridge {
     emit Set_Admin(_admin);
   }
 
-  function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAdmin {
+  function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     penalty_amount += amount;
     emit Add_Penalty_Amount(amount, info_hash);
   }
 
-  function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAdmin {
+  function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     require(penalty_amount >= amount, "over penalty amount");
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
