@@ -36,7 +36,8 @@ contract Jax2BscBridge {
     address to;
     RequestStatus status;
     string from;
-    string txHash;
+    string deposit_tx_hash;
+    string release_tx_hash;
   }
 
   string[] public deposit_addresses;
@@ -48,6 +49,8 @@ contract Jax2BscBridge {
 
   mapping(address => uint[]) public user_requests;
 
+  address[] public auditors;
+  address[] public verifiers;
   address[] public bridge_operators;
   mapping(address => uint) operating_limits;
 
@@ -82,6 +85,15 @@ contract Jax2BscBridge {
     _;
   }
 
+  modifier onlyAuditor() {
+    require(isAuditor(msg.sender), "Only Auditor can perform this operation.");
+    _;
+  }
+
+  modifier onlyVerifier() {
+    require(isVerifier(msg.sender), "Only Verifier can perform this operation.");
+    _;
+  }
 
   modifier onlyOperator() {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
@@ -151,6 +163,12 @@ contract Jax2BscBridge {
     emit Prove_Request(request_id, tx_hash);
   }
 
+  function add_deposit_hash(uint request_id, string calldata deposit_tx_hash) external onlyVerifier {
+    Request storage request = requests[request_id];
+    require(bytes(request.deposit_tx_hash).length == 0, "");
+    request.deposit_tx_hash = deposit_tx_hash;
+  }
+
   function reject_request(uint request_id) external onlyOperator {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Init || request.status == RequestStatus.Proved, "Invalid status");
@@ -163,45 +181,113 @@ contract Jax2BscBridge {
     uint amount,
     string calldata from,
     address to,
-    string calldata txHash
+    string calldata deposit_tx_hash
   ) external onlyOperator {
     Request storage request = requests[request_id];
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
     require(request.status == RequestStatus.Proved, "Invalid status");
-    require(request.txdHash == keccak256(abi.encodePacked(txHash)), "Invalid txHash");
+    require(request.txdHash == keccak256(abi.encodePacked(deposit_tx_hash)), "Invalid deposit_tx_hash");
     require(proccessed_txd_hashes[request.txdHash] == false, "Txd hash already processed");
     require(request.amount_hash == keccak256(abi.encodePacked(request_id, amount)), "Incorrect amount");
     require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Sender's address mismatch");
     require(request.to == to, "destination address mismatch");
-    request.txHash = txHash;
-    deposit_address_locktimes[request.deposit_address_id] = 0;
+    require(bytes(request.deposit_tx_hash).length > 0, "Request is not verified");
+    require(keccak256(abi.encodePacked(request.deposit_tx_hash)) == keccak256(abi.encodePacked(deposit_tx_hash)), "Deposit tx hash mismatch");
     request.amount = amount;
     request.status = RequestStatus.Released;
     proccessed_txd_hashes[request.txdHash] = true;
     uint fee_amount = request.amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
-    wjax.mint(address(this), request.amount - fee_amount);
+    wjax.mint(address(this), request.amount);
     wjax.transfer(request.to, request.amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
-        wjax.mint(penalty_wallet, fee_amount);
+        wjax.transfer(penalty_wallet, fee_amount);
         penalty_amount -= fee_amount;
       }
       else {
-        wjax.mint(penalty_wallet, penalty_amount);
-        wjax.mint(msg.sender, fee_amount - penalty_amount);
+        wjax.transfer(penalty_wallet, penalty_amount);
+        wjax.transfer(msg.sender, fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.mint(msg.sender, fee_amount);
+      wjax.transfer(msg.sender, fee_amount);
     }
     operating_limits[msg.sender] -= amount;
     emit Release(request_id, request.to, request.amount - fee_amount);
   }
 
+  function complete_release_tx_hash(uint request_id, string calldata release_tx_hash) external onlyAuditor {
+    Request storage request = requests[request_id];
+    require(bytes(request.release_tx_hash).length == 0, "");
+    request.release_tx_hash = release_tx_hash;
+  }
+
+  function update_release_tx_hash(uint request_id, string calldata release_tx_hash) external onlyAdmin {
+    Request storage request = requests[request_id];
+    request.release_tx_hash = release_tx_hash;
+  }
+
   function get_user_requests(address user) external view returns(uint[] memory) {
     return user_requests[user];
+  }
+
+  function add_auditor(address auditor) external onlyAdmin {
+    for(uint i = 0; i < auditors.length; i += 1) {
+      if(auditors[i] == auditor)
+        revert("Already exists");
+    }
+    auditors.push(auditor);
+  }
+
+  function delete_auditor(address auditor) external onlyAdmin {
+    uint i = 0;
+    for(; i < auditors.length; i += 1) {
+      if(auditors[i] == auditor)
+        break;
+    }
+    require(i < auditors.length, "Not an auditor");
+    auditors[i] = auditors[auditors.length - 1];
+    auditors.pop();
+  }
+
+  function isAuditor(address auditor) public view returns(bool) {
+    uint i = 0;
+    for(; i < auditors.length; i += 1) {
+      if(auditors[i] == auditor)
+        return true;
+    } 
+    return false;
+  }
+
+
+  function add_verifier(address verifier) external onlyAdmin {
+    for(uint i = 0; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
+        revert("Already exists");
+    }
+    verifiers.push(verifier);
+  }
+
+  function delete_verifier(address verifier) external onlyAdmin {
+    uint i = 0;
+    for(; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
+        break;
+    }
+    require(i < verifiers.length, "Not an verifier");
+    verifiers[i] = verifiers[verifiers.length - 1];
+    verifiers.pop();
+  }
+
+  function isVerifier(address verifier) public view returns(bool) {
+    uint i = 0;
+    for(; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
+        return true;
+    } 
+    return false;
   }
 
   function add_bridge_operator(address operator, uint operating_limit) external onlyAdmin {

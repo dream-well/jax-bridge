@@ -138,7 +138,8 @@ contract WjaxBscBridge {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     require( deposit_hash == keccak256(abi.encodePacked(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_timestamp)), "Incorrect deposit hash");
     bytes32 _txHash = keccak256(abi.encodePacked(txHash));
-    require( proccessed_deposit_hashes[deposit_hash] == false && proccessed_tx_hashes[_txHash] == false, "Already processed" );
+    require( !proccessed_deposit_hashes[deposit_hash] && !proccessed_tx_hashes[_txHash], "Already processed" );
+    require( !valid_deposit_hashes[deposit_hash], "Already set" );
     valid_deposit_hashes[deposit_hash] = true;
   }
 
