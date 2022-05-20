@@ -106,7 +106,7 @@ contract Wjxn2JxnBridge {
     requests.push(request);
     user_requests[msg.sender].push(request_id);
     wjxn2.transferFrom(msg.sender, address(this), amount);
-    wjxn2.burn(amount);
+    wjxn2.burn(amount - fee_amount);
     emit Deposit(request_id, amount, fee_amount, msg.sender, to);
   }
 
@@ -141,7 +141,6 @@ contract Wjxn2JxnBridge {
     proccessed_txd_hashes[jaxnet_txd_hash] = true;
     proccessed_txd_hashes[local_txd_hash] = true;
     uint fee_amount = request.fee_amount;
-    wjxn2.mint(address(this), fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
         wjxn2.transfer(penalty_wallet, fee_amount);

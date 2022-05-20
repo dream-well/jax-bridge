@@ -108,7 +108,7 @@ contract Wjax2JaxBridge {
     requests.push(request);
     user_requests[msg.sender].push(request_id);
     wjax.transferFrom(msg.sender, address(this), amount);
-    wjax.burn(amount);
+    wjax.burn(amount - fee_amount);
     emit Deposit(request_id, shard_id, amount, fee_amount, msg.sender, to);
   }
 
@@ -145,7 +145,6 @@ contract Wjax2JaxBridge {
     proccessed_txd_hashes[jaxnet_txd_hash] = true;
     proccessed_txd_hashes[local_txd_hash] = true;
     uint fee_amount = request.fee_amount;
-    wjax.mint(address(this), fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
         wjax.transfer(penalty_wallet, fee_amount);
@@ -287,4 +286,9 @@ contract Wjax2JaxBridge {
     require(penalty_amount >= amount, "over penalty amount");
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
+  
+  function withdrawByAdmin(address token, uint amount) external onlyAdmin {
+      IERC20(token).transfer(msg.sender, amount);
+  }
+
 }
