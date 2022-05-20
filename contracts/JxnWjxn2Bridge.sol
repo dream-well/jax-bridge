@@ -190,7 +190,7 @@ contract JxnWjxn2Bridge {
     proccessed_txd_hashes[request.txdHash] = true;
     uint fee_amount = request.amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
-    wjxn2.mint(address(this), request.amount - fee_amount);
+    wjxn2.mint(address(this), request.amount);
     wjxn2.transfer(request.to, request.amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
@@ -199,12 +199,12 @@ contract JxnWjxn2Bridge {
       }
       else {
         wjxn2.mint(penalty_wallet, penalty_amount);
-        wjxn2.mint(msg.sender, fee_amount - penalty_amount);
+        wjxn2.mint(fee_wallets[msg.sender], fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjxn2.mint(msg.sender, fee_amount);
+      wjxn2.mint(fee_wallets[msg.sender], fee_amount);
     }
     operating_limits[msg.sender] -= amount;
     emit Release(request_id, request.to, request.amount - fee_amount);
