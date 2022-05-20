@@ -3,6 +3,7 @@
 pragma solidity 0.8.11;
 
 interface IWJAX {
+  function mint(address, uint) external;
   function burn(uint) external;
   function transfer(address, uint) external;
   function transferFrom(address, address, uint) external;
@@ -107,6 +108,7 @@ contract Wjax2JaxBridge {
     requests.push(request);
     user_requests[msg.sender].push(request_id);
     wjax.transferFrom(msg.sender, address(this), amount);
+    wjax.burn(amount);
     emit Deposit(request_id, shard_id, amount, fee_amount, msg.sender, to);
   }
 
@@ -143,7 +145,7 @@ contract Wjax2JaxBridge {
     proccessed_txd_hashes[jaxnet_txd_hash] = true;
     proccessed_txd_hashes[local_txd_hash] = true;
     uint fee_amount = request.fee_amount;
-    wjax.burn(amount - fee_amount);
+    wjax.mint(address(this), fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
         wjax.transfer(penalty_wallet, fee_amount);
