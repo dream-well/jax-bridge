@@ -183,11 +183,6 @@ contract Wjxn2JxnBridge {
     return user_requests[user];
   }
 
-  function withdrawByAdmin(address token, uint amount) external onlyAdmin {
-      IERC20(token).transfer(msg.sender, amount);
-      emit Withdraw_By_Admin(token, amount);
-  }
-
   function add_auditor(address auditor) external onlyAdmin {
     for(uint i = 0; i < auditors.length; i += 1) {
       if(auditors[i] == auditor)
@@ -293,7 +288,7 @@ contract Wjxn2JxnBridge {
     penalty_amount -= amount;
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
-  
+
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
       emit Withdraw_By_Admin(token, amount);
