@@ -66,12 +66,6 @@ contract WjxnBscBridge {
   event Update_Release_Tx_Hash(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Reject_Request(uint request_id);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
-  event Set_Operating_Limit(address operator, uint operating_limit);
-  event Set_Penalty_Wallet(address wallet);
-  event Set_Admin(address admin);
-  event Delete_Deposit_Addresses(uint[] ids);
-  event Add_Penalty_Amount(uint amount, bytes32 info_hash);
-  event Subtract_Penalty_Amount(uint amount, bytes32 info_hash);
 
   constructor() {
     admin = msg.sender;
@@ -279,7 +273,6 @@ contract WjxnBscBridge {
   function set_operating_limit(address operator, uint operating_limit) external onlyAdmin {
     require(isBridgeOperator(operator), "Not a bridge operator");
     operating_limits[operator] = operating_limit;
-    emit Set_Operating_Limit(operator, operating_limit);
   }
 
   function set_fee(uint _fee_percent, uint _minimum_fee_amount) external onlyAdmin {
@@ -290,22 +283,19 @@ contract WjxnBscBridge {
 
   function set_penalty_wallet(address _penalty_wallet) external onlyAdmin {
     penalty_wallet = _penalty_wallet;
-    emit Set_Penalty_Wallet(_penalty_wallet);
   }
 
   function set_admin(address _admin) external onlyAdmin {
     admin = _admin;
-    emit Set_Admin(_admin);
   }
 
   function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     penalty_amount += amount;
-    emit Add_Penalty_Amount(amount, info_hash);
   }
 
   function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     require(penalty_amount >= amount, "over penalty amount");
-    emit Subtract_Penalty_Amount(amount, info_hash);
+    penalty_amount -= amount;
   }
 
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {

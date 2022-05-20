@@ -319,7 +319,6 @@ contract Jax2BscBridge {
   function set_operating_limit(address operator, uint operating_limit) external onlyAdmin {
     require(isBridgeOperator(operator), "Not a bridge operator");
     operating_limits[operator] = operating_limit;
-    emit Set_Operating_Limit(operator, operating_limit);
   }
 
   function set_fee(uint _fee_percent, uint _minimum_fee_amount) external onlyAdmin {
@@ -354,12 +353,10 @@ contract Jax2BscBridge {
 
   function set_penalty_wallet(address _penalty_wallet) external onlyAdmin {
     penalty_wallet = _penalty_wallet;
-    emit Set_Penalty_Wallet(_penalty_wallet);
   }
 
   function set_admin(address _admin) external onlyAdmin {
     admin = _admin;
-    emit Set_Admin(_admin);
   }
 
   function get_new_request_id() external view returns(uint) {
@@ -372,12 +369,11 @@ contract Jax2BscBridge {
   
   function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     penalty_amount += amount;
-    emit Add_Penalty_Amount(amount, info_hash);
   }
 
   function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     require(penalty_amount >= amount, "over penalty amount");
-    emit Subtract_Penalty_Amount(amount, info_hash);
+    penalty_amount -= amount;
   }
   
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
