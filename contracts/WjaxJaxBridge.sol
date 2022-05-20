@@ -54,6 +54,9 @@ contract Wjax2JaxBridge {
 
   event Deposit(uint request_id, uint shard_id, uint amount, uint fee_amount, address from, string to);
   event Release(uint request_id, string to, uint amount, string txHash);
+  event Add_Deposit_Hash(uint request_id, string deposit_tx_hash);
+  event Complete_Release_Tx_Hash(uint request_id, string release_tx_hash);
+  event Update_Release_Tx_Hash(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Set_Operating_Limit(address operator, uint operating_limit);
   event Set_Penalty_Wallet(address wallet);
@@ -116,6 +119,7 @@ contract Wjax2JaxBridge {
     Request storage request = requests[request_id];
     require(bytes(request.deposit_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;
+    emit Add_Deposit_Hash(request_id, deposit_tx_hash);
   }
 
   function release(
@@ -163,17 +167,18 @@ contract Wjax2JaxBridge {
     emit Release(request_id, request.to, request.amount, jaxnet_tx_hash);
   }
 
-  function complete_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAuditor {
+  function complete_release_tx_hash(uint request_id, string calldata release_tx_hash) external onlyAuditor {
     Request storage request = requests[request_id];
-    require(bytes(request.deposit_tx_hash).length == 0, "");
-    request.deposit_tx_hash = deposit_tx_hash;
+    require(bytes(request.release_tx_hash).length == 0, "");
     request.release_tx_hash = release_tx_hash;
+    emit Complete_Release_Tx_Hash(request_id, release_tx_hash);
   }
 
   function update_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAdmin {
     Request storage request = requests[request_id];
     request.deposit_tx_hash = deposit_tx_hash;
     request.release_tx_hash = release_tx_hash;
+    emit Update_Release_Tx_Hash(request_id, deposit_tx_hash, release_tx_hash);
   }
   function get_user_requests(address user) external view returns(uint[] memory) {
     return user_requests[user];

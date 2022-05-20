@@ -61,6 +61,9 @@ contract WjxnBscBridge {
     uint128 deposit_timestamp, 
     string txHash
   );
+  event Add_Deposit_Hash(uint request_id, string deposit_tx_hash);
+  event Complete_Release_Tx_Hash(uint request_id, string deposit_tx_hash, string release_tx_hash);
+  event Update_Release_Tx_Hash(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Reject_Request(uint request_id);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Set_Operating_Limit(address operator, uint operating_limit);
@@ -140,6 +143,7 @@ contract WjxnBscBridge {
     bytes32 _txHash = keccak256(abi.encodePacked(txHash));
     require( proccessed_deposit_hashes[deposit_hash] == false && proccessed_tx_hashes[_txHash] == false, "Already processed" );
     valid_deposit_hashes[deposit_hash] = true;
+    emit Add_Deposit_Hash(request_id, txHash);
   }
 
   function release(
@@ -183,14 +187,17 @@ contract WjxnBscBridge {
   function complete_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAuditor {
     Request storage request = requests[request_id];
     require(bytes(request.deposit_tx_hash).length == 0, "");
+    require(bytes(request.release_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;
     request.release_tx_hash = release_tx_hash;
+    emit Complete_Release_Tx_Hash(request_id, deposit_tx_hash, release_tx_hash);
   }
 
   function update_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAdmin {
     Request storage request = requests[request_id];
     request.deposit_tx_hash = deposit_tx_hash;
     request.release_tx_hash = release_tx_hash;
+    emit Update_Release_Tx_Hash(request_id, deposit_tx_hash, release_tx_hash);
   }
 
   function add_auditor(address auditor) external onlyAdmin {

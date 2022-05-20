@@ -61,6 +61,9 @@ contract JxnWjxn2Bridge {
   event Expire_Request(uint request_id);
   event Reject_Request(uint request_id);
   event Release(uint request_id, address from, uint amount);
+  event Add_Deposit_Hash(uint request_id, string deposit_tx_hash);
+  event Complete_Release_Tx_Hash(uint request_id, string release_tx_hash);
+  event Update_Release_Tx_Hash(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Set_Operating_Limit(address operator, uint operating_limit);
   event Free_Deposit_Address(uint deposit_address_id);
@@ -165,6 +168,7 @@ contract JxnWjxn2Bridge {
     Request storage request = requests[request_id];
     require(bytes(request.deposit_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;
+    emit Add_Deposit_Hash(request_id, deposit_tx_hash);
   }
 
   function reject_request(uint request_id) external onlyVerifier {
@@ -216,17 +220,18 @@ contract JxnWjxn2Bridge {
     emit Release(request_id, request.to, request.amount - fee_amount);
   }
 
-  function complete_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAuditor {
+  function complete_release_tx_hash(uint request_id, string calldata release_tx_hash) external onlyAuditor {
     Request storage request = requests[request_id];
-    require(bytes(request.deposit_tx_hash).length == 0, "");
-    request.deposit_tx_hash = deposit_tx_hash;
+    require(bytes(request.release_tx_hash).length == 0, "");
     request.release_tx_hash = release_tx_hash;
+    emit Complete_Release_Tx_Hash(request_id, release_tx_hash);
   }
 
   function update_release_tx_hash(uint request_id, string calldata deposit_tx_hash, string calldata release_tx_hash) external onlyAdmin {
     Request storage request = requests[request_id];
     request.deposit_tx_hash = deposit_tx_hash;
     request.release_tx_hash = release_tx_hash;
+    emit Update_Release_Tx_Hash(request_id, deposit_tx_hash, release_tx_hash);
   }
 
   function get_user_requests(address user) external view returns(uint[] memory) {
