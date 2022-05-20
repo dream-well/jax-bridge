@@ -203,6 +203,17 @@ contract WjaxPolygonBridge {
     auditors.push(auditor);
   }
 
+  function delete_auditor(address auditor) external onlyAdmin {
+    uint i = 0;
+    for(; i < auditors.length; i += 1) {
+      if(auditors[i] == auditor)
+        break;
+    }
+    require(i < auditors.length, "Not an auditor");
+    auditors[i] = auditors[auditors.length - 1];
+    auditors.pop();
+  }
+
   function isAuditor(address auditor) public view returns(bool) {
     uint i = 0;
     for(; i < auditors.length; i += 1) {
@@ -219,6 +230,17 @@ contract WjaxPolygonBridge {
         revert("Already exists");
     }
     verifiers.push(verifier);
+  }
+
+  function delete_verifier(address verifier) external onlyAdmin {
+    uint i = 0;
+    for(; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
+        break;
+    }
+    require(i < verifiers.length, "Not an verifier");
+    verifiers[i] = verifiers[verifiers.length - 1];
+    verifiers.pop();
   }
 
   function isVerifier(address verifier) public view returns(bool) {

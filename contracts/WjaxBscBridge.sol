@@ -2,7 +2,10 @@
 
 pragma solidity 0.8.11;
 
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
+interface IERC20 {
+  function transfer(address, uint) external;
+  function transferFrom(address, address, uint) external;
+}
 
 contract WjaxBscBridge {
 
@@ -36,8 +39,10 @@ contract WjaxBscBridge {
   mapping(address => uint[]) public user_requests;
 
   address[] public auditors;
+  address[] public verifiers;
   address[] public bridge_operators;
   mapping(address => uint) operating_limits;
+  mapping(address => address) fee_wallets;
 
   mapping(bytes32 => bool) valid_deposit_hashes;
   mapping(bytes32 => bool) proccessed_deposit_hashes;
@@ -85,6 +90,11 @@ contract WjaxBscBridge {
     _;
   }
 
+  modifier onlyVerifier() {
+    require(isVerifier(msg.sender), "Only Verifier can perform this operation.");
+    _;
+  }
+
   modifier onlyOperator() {
     require(isBridgeOperator(msg.sender), "Not a bridge operator");
     _;
@@ -124,7 +134,7 @@ contract WjaxBscBridge {
     uint deposit_timestamp,
     bytes32 deposit_hash,
     string calldata txHash
-  ) external onlyAuditor {
+  ) external onlyVerifier {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     require( deposit_hash == keccak256(abi.encodePacked(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_timestamp)), "Incorrect deposit hash");
     bytes32 _txHash = keccak256(abi.encodePacked(txHash));
@@ -156,12 +166,12 @@ contract WjaxBscBridge {
       }
       else {
         wjax.transfer(penalty_wallet, penalty_amount);
-        wjax.transfer(msg.sender, fee_amount - penalty_amount);
+        wjax.transfer(fee_wallets[msg.sender], fee_amount - penalty_amount);
         penalty_amount -= penalty_amount;
       }
     }
     else {
-      wjax.transfer(msg.sender, fee_amount);
+      wjax.transfer(fee_wallets[msg.sender], fee_amount);
     }
     operating_limits[msg.sender] -= amount;
     proccessed_deposit_hashes[deposit_hash] = true;
@@ -190,6 +200,17 @@ contract WjaxBscBridge {
     auditors.push(auditor);
   }
 
+  function delete_auditor(address auditor) external onlyAdmin {
+    uint i = 0;
+    for(; i < auditors.length; i += 1) {
+      if(auditors[i] == auditor)
+        break;
+    }
+    require(i < auditors.length, "Not an auditor");
+    auditors[i] = auditors[auditors.length - 1];
+    auditors.pop();
+  }
+
   function isAuditor(address auditor) public view returns(bool) {
     uint i = 0;
     for(; i < auditors.length; i += 1) {
@@ -199,13 +220,43 @@ contract WjaxBscBridge {
     return false;
   }
 
-  function add_bridge_operator(address operator, uint operating_limit) external onlyAdmin {
+
+  function add_verifier(address verifier) external onlyAdmin {
+    for(uint i = 0; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
+        revert("Already exists");
+    }
+    verifiers.push(verifier);
+  }
+
+  function delete_verifier(address verifier) external onlyAdmin {
+    uint i = 0;
+    for(; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
+        break;
+    }
+    require(i < verifiers.length, "Not an verifier");
+    verifiers[i] = verifiers[verifiers.length - 1];
+    verifiers.pop();
+  }
+
+  function isVerifier(address verifier) public view returns(bool) {
+    uint i = 0;
+    for(; i < verifiers.length; i += 1) {
+      if(verifiers[i] == verifier)
+        return true;
+    } 
+    return false;
+  }
+
+  function add_bridge_operator(address operator, uint operating_limit, address fee_wallet) external onlyAdmin {
     for(uint i = 0; i < bridge_operators.length; i += 1) {
       if(bridge_operators[i] == operator)
         revert("Already exists");
     }
     bridge_operators.push(operator);
     operating_limits[operator] = operating_limit;
+    fee_wallets[operator] = fee_wallet;
   }
 
   function isBridgeOperator(address operator) public view returns(bool) {
