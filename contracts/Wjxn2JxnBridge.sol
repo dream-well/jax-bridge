@@ -138,7 +138,9 @@ contract Wjxn2JxnBridge {
     require(keccak256(abi.encodePacked(request.to)) == keccak256(abi.encodePacked(to)), "Destination address mismatch");
     require(proccessed_txd_hashes[jaxnet_txd_hash] == false, "Jaxnet TxHash already used");
     require(proccessed_txd_hashes[local_txd_hash] == false, "Local TxHash already used");
+    require(bytes(request.deposit_tx_hash).length > 0, "Request is not verified");
     require(keccak256(abi.encodePacked(request.deposit_tx_hash)) == keccak256(abi.encodePacked(deposit_tx_hash)), "Deposit tx hash mismatch");
+    
     request.jaxnet_tx_hash = jaxnet_tx_hash;
     request.released_at = block.timestamp;
     request.status = RequestStatus.Released;

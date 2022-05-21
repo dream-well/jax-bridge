@@ -190,7 +190,9 @@ contract JxnWjxn2Bridge {
     require(request.amount_hash == keccak256(abi.encodePacked(request_id, amount)), "Incorrect amount");
     require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Sender's address mismatch");
     require(request.to == to, "destination address mismatch");
+    require(bytes(request.deposit_tx_hash).length > 0, "Request is not verified");
     require(keccak256(abi.encodePacked(request.deposit_tx_hash)) == keccak256(abi.encodePacked(deposit_tx_hash)), "Deposit tx hash mismatch");
+    
     deposit_address_locktimes[request.deposit_address_id] = 0;
     request.amount = amount;
     request.status = RequestStatus.Released;

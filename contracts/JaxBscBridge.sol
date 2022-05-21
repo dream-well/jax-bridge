@@ -195,6 +195,7 @@ contract Jax2BscBridge {
     require(request.to == to, "destination address mismatch");
     require(bytes(request.deposit_tx_hash).length > 0, "Request is not verified");
     require(keccak256(abi.encodePacked(request.deposit_tx_hash)) == keccak256(abi.encodePacked(deposit_tx_hash)), "Deposit tx hash mismatch");
+    
     request.amount = amount;
     request.status = RequestStatus.Released;
     proccessed_txd_hashes[request.txdHash] = true;
