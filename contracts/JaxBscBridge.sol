@@ -244,6 +244,10 @@ contract JaxBscBridge {
     ) external onlyAuditor {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Released, "Invalid status");
+    require(request.amount == amount, "Incorrect amount");
+    require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Incorrect from");
+    require(request.to == to, "Incorrect to");
+    require(keccak256(abi.encodePacked(request.deposit_tx_hash)) == keccak256(abi.encodePacked(deposit_tx_hash)), "Incorrect deposit tx hash");
     require(bytes(request.deposit_tx_link).length == 0, "");
     require(bytes(request.release_tx_link).length == 0, "");
     request.deposit_tx_link = deposit_tx_link;
