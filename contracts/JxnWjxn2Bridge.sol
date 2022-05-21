@@ -20,7 +20,7 @@ contract JxnWjxn2Bridge {
 
   address public penalty_wallet;  
   
-  uint max_pending_audit_records;
+  uint max_pending_audit_records = 10;
   uint pending_audit_records;
 
   IERC20 public wjxn2 = IERC20(0xe3345c59ECd8B9C157Dd182BA9500aace899AD31);
@@ -238,7 +238,6 @@ contract JxnWjxn2Bridge {
     Request storage request = requests[request_id];
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
-    pending_audit_records -= 1;
     emit Update_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 

@@ -20,7 +20,7 @@ contract JaxBscBridge {
 
   address public penalty_wallet;  
   
-  uint max_pending_audit_records;
+  uint max_pending_audit_records = 10;
   uint pending_audit_records;  
   
   IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
@@ -233,8 +233,17 @@ contract JaxBscBridge {
   }
 
 
-  function complete_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAuditor {
+  function complete_release_tx_link(
+    uint request_id, 
+    uint amount,
+    string calldata from,
+    address to,
+    string calldata deposit_tx_hash,
+    string calldata deposit_tx_link, 
+    string calldata release_tx_link
+    ) external onlyAuditor {
     Request storage request = requests[request_id];
+    require(request.status == RequestStatus.Released, "Invalid status");
     require(bytes(request.deposit_tx_link).length == 0, "");
     require(bytes(request.release_tx_link).length == 0, "");
     request.deposit_tx_link = deposit_tx_link;
@@ -247,7 +256,6 @@ contract JaxBscBridge {
     Request storage request = requests[request_id];
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
-    pending_audit_records -= 1;
     emit Update_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 

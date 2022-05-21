@@ -22,7 +22,7 @@ contract WjaxPolygonBridge {
 
   address public penalty_wallet;  
   
-  uint max_pending_audit_records;
+  uint max_pending_audit_records = 10;
   uint pending_audit_records;
 
   IERC20 public wjax = IERC20(0x2b66837c742fcA971bF4261d6AfEB67d66E32BdD);
@@ -204,7 +204,6 @@ contract WjaxPolygonBridge {
     Request storage request = requests[request_id];
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
-    pending_audit_records -= 1;
     emit Update_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 
