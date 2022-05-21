@@ -7,7 +7,7 @@ interface IERC20 {
   function transfer(address, uint) external;
 }
 
-contract Jax2BscBridge {
+contract JaxBscBridge {
 
   uint chainId;
   
@@ -52,7 +52,7 @@ contract Jax2BscBridge {
 
   address[] public auditors;
   address[] public verifiers;
-  address[] public bridge_operators;
+  address[] public bridge_executors;
   mapping(address => uint) operating_limits;
   mapping(address => address) fee_wallets;
 
@@ -96,8 +96,8 @@ contract Jax2BscBridge {
     _;
   }
 
-  modifier onlyOperator() {
-    require(isBridgeOperator(msg.sender), "Not a bridge operator");
+  modifier onlyExecutor() {
+    require(isBridgeExecutor(msg.sender), "Not a bridge executor");
     _;
   }
 
@@ -164,7 +164,15 @@ contract Jax2BscBridge {
     emit Prove_Request(request_id, tx_hash);
   }
 
-  function add_deposit_hash(uint request_id, string calldata deposit_tx_hash) external onlyVerifier {
+  function add_deposit_hash(
+    uint request_id,
+    uint shard_id, 
+    uint amount, 
+    uint deposit_address_id, 
+    address to, 
+    string calldata from, 
+    string calldata deposit_tx_hash
+  ) external onlyVerifier {
     Request storage request = requests[request_id];
     require(bytes(request.deposit_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;
@@ -184,7 +192,7 @@ contract Jax2BscBridge {
     string calldata from,
     address to,
     string calldata deposit_tx_hash
-  ) external onlyOperator {
+  ) external onlyExecutor {
     Request storage request = requests[request_id];
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
     require(request.status == RequestStatus.Proved, "Invalid status");
@@ -299,28 +307,28 @@ contract Jax2BscBridge {
     return false;
   }
 
-  function add_bridge_operator(address operator, uint operating_limit, address fee_wallet) external onlyAdmin {
-    for(uint i = 0; i < bridge_operators.length; i += 1) {
-      if(bridge_operators[i] == operator)
+  function add_bridge_executor(address executor, uint operating_limit, address fee_wallet) external onlyAdmin {
+    for(uint i = 0; i < bridge_executors.length; i += 1) {
+      if(bridge_executors[i] == executor)
         revert("Already exists");
     }
-    bridge_operators.push(operator);
-    operating_limits[operator] = operating_limit;
-    fee_wallets[operator] = fee_wallet;
+    bridge_executors.push(executor);
+    operating_limits[executor] = operating_limit;
+    fee_wallets[executor] = fee_wallet;
   }
 
-  function isBridgeOperator(address operator) public view returns(bool) {
+  function isBridgeExecutor(address executor) public view returns(bool) {
     uint i = 0;
-    for(; i < bridge_operators.length; i += 1) {
-      if(bridge_operators[i] == operator)
+    for(; i < bridge_executors.length; i += 1) {
+      if(bridge_executors[i] == executor)
         return true;
     } 
     return false;
   }
 
-  function set_operating_limit(address operator, uint operating_limit) external onlyAdmin {
-    require(isBridgeOperator(operator), "Not a bridge operator");
-    operating_limits[operator] = operating_limit;
+  function set_operating_limit(address executor, uint operating_limit) external onlyAdmin {
+    require(isBridgeExecutor(executor), "Not a bridge executor");
+    operating_limits[executor] = operating_limit;
   }
 
   function set_fee(uint _fee_percent, uint _minimum_fee_amount) external onlyAdmin {

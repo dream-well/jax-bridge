@@ -30,8 +30,8 @@ contract WjxnBscBridge {
     address to;
     uint deposit_timestamp;
     bytes32 deposit_hash;
-    string deposit_tx_hash;
-    string release_tx_hash;
+    string deposit_tx_link;
+    string release_tx_link;
   }
 
   Request[] public requests;
@@ -40,7 +40,7 @@ contract WjxnBscBridge {
 
   address[] public auditors;
   address[] public verifiers;
-  address[] public bridge_operators;
+  address[] public bridge_executors;
   mapping(address => uint) operating_limits;
   mapping(address => address) fee_wallets;
 
@@ -61,9 +61,9 @@ contract WjxnBscBridge {
     uint128 deposit_timestamp, 
     string txHash
   );
-  event Add_Deposit_Hash(uint request_id, string deposit_tx_hash);
-  event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
-  event Update_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
+  event Add_Deposit_Hash(uint request_id, string deposit_tx_link);
+  event Complete_Release_Tx_Link(uint request_id, string deposit_tx_link, string release_tx_link);
+  event Update_Release_Tx_Link(uint request_id, string deposit_tx_link, string release_tx_link);
   event Reject_Request(uint request_id);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Add_Penalty_Amount(uint amount, bytes32 info_hash);
@@ -95,8 +95,8 @@ contract WjxnBscBridge {
     _;
   }
 
-  modifier onlyOperator() {
-    require(isBridgeOperator(msg.sender), "Not a bridge operator");
+  modifier onlyExecutor() {
+    require(isBridgeExecutor(msg.sender), "Not a bridge executor");
     _;
   }
 
@@ -115,8 +115,8 @@ contract WjxnBscBridge {
       to: msg.sender,
       deposit_timestamp: block.timestamp,
       deposit_hash: deposit_hash,
-      deposit_tx_hash: "",
-      release_tx_hash: ""
+      deposit_tx_link: "",
+      release_tx_link: ""
     });
     requests.push(request);
     wjxn.transferFrom(msg.sender, address(this), amount);
@@ -153,7 +153,7 @@ contract WjxnBscBridge {
     uint deposit_timestamp,
     bytes32 deposit_hash,
     string calldata txHash
-  ) external onlyOperator {
+  ) external onlyExecutor {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     require( deposit_hash == keccak256(abi.encodePacked(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_timestamp)), "Incorrect deposit hash");
     bytes32 _txHash = keccak256(abi.encodePacked(txHash));
@@ -254,28 +254,28 @@ contract WjxnBscBridge {
     return false;
   }
 
-  function add_bridge_operator(address operator, uint operating_limit, address fee_wallet) external onlyAdmin {
-    for(uint i = 0; i < bridge_operators.length; i += 1) {
-      if(bridge_operators[i] == operator)
+  function add_bridge_executor(address executor, uint operating_limit, address fee_wallet) external onlyAdmin {
+    for(uint i = 0; i < bridge_executors.length; i += 1) {
+      if(bridge_executors[i] == executor)
         revert("Already exists");
     }
-    bridge_operators.push(operator);
-    operating_limits[operator] = operating_limit;
-    fee_wallets[operator] = fee_wallet;
+    bridge_executors.push(executor);
+    operating_limits[executor] = operating_limit;
+    fee_wallets[executor] = fee_wallet;
   }
 
-  function isBridgeOperator(address operator) public view returns(bool) {
+  function isBridgeExecutor(address executor) public view returns(bool) {
     uint i = 0;
-    for(; i < bridge_operators.length; i += 1) {
-      if(bridge_operators[i] == operator)
+    for(; i < bridge_executors.length; i += 1) {
+      if(bridge_executors[i] == executor)
         return true;
     } 
     return false;
   }
 
-  function set_operating_limit(address operator, uint operating_limit) external onlyAdmin {
-    require(isBridgeOperator(operator), "Not a bridge operator");
-    operating_limits[operator] = operating_limit;
+  function set_operating_limit(address executor, uint operating_limit) external onlyAdmin {
+    require(isBridgeExecutor(executor), "Not a bridge executor");
+    operating_limits[executor] = operating_limit;
   }
 
   function set_fee(uint _fee_percent, uint _minimum_fee_amount) external onlyAdmin {

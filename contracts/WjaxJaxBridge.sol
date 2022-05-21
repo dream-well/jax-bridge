@@ -9,7 +9,7 @@ interface IERC20 {
   function transferFrom(address, address, uint) external;
 }
 
-contract Wjax2JaxBridge {
+contract WjaxJaxBridge {
 
   uint chainId;
   
@@ -47,7 +47,7 @@ contract Wjax2JaxBridge {
 
   address[] public auditors;
   address[] public verifiers;
-  address[] public bridge_operators;
+  address[] public bridge_executors;
   mapping(address => uint) operating_limits;
   mapping(address => address) fee_wallets;
 
@@ -89,8 +89,8 @@ contract Wjax2JaxBridge {
     _;
   }
 
-  modifier onlyOperator() {
-    require(isBridgeOperator(msg.sender), "Not a bridge operator");
+  modifier onlyExecutor() {
+    require(isBridgeExecutor(msg.sender), "Not a bridge executor");
     _;
   }
 
@@ -130,7 +130,7 @@ contract Wjax2JaxBridge {
     string calldata to,
     string calldata deposit_tx_hash,
     string calldata jaxnet_tx_hash
-  ) external onlyOperator {
+  ) external onlyExecutor {
     Request storage request = requests[request_id];
     bytes32 jaxnet_txd_hash = keccak256(abi.encodePacked(jaxnet_tx_hash));
     bytes32 local_txd_hash = keccak256(abi.encodePacked(deposit_tx_hash));
@@ -189,14 +189,14 @@ contract Wjax2JaxBridge {
     return user_requests[user];
   }
 
-  function add_bridge_operator(address operator, uint operating_limit, address fee_wallet) external onlyAdmin {
-    for(uint i = 0; i < bridge_operators.length; i += 1) {
-      if(bridge_operators[i] == operator)
+  function add_bridge_executor(address executor, uint operating_limit, address fee_wallet) external onlyAdmin {
+    for(uint i = 0; i < bridge_executors.length; i += 1) {
+      if(bridge_executors[i] == executor)
         revert("Already exists");
     }
-    bridge_operators.push(operator);
-    operating_limits[operator] = operating_limit;
-    fee_wallets[operator] = fee_wallet;
+    bridge_executors.push(executor);
+    operating_limits[executor] = operating_limit;
+    fee_wallets[executor] = fee_wallet;
   }
 
   function add_auditor(address auditor) external onlyAdmin {
@@ -256,18 +256,18 @@ contract Wjax2JaxBridge {
     return false;
   }
 
-  function isBridgeOperator(address operator) public view returns(bool) {
+  function isBridgeExecutor(address executor) public view returns(bool) {
     uint i = 0;
-    for(; i < bridge_operators.length; i += 1) {
-      if(bridge_operators[i] == operator)
+    for(; i < bridge_executors.length; i += 1) {
+      if(bridge_executors[i] == executor)
         return true;
     } 
     return false;
   }
 
-  function set_operating_limit(address operator, uint operating_limit) external onlyAdmin {
-    require(isBridgeOperator(operator), "Not a bridge operator");
-    operating_limits[operator] = operating_limit;
+  function set_operating_limit(address executor, uint operating_limit) external onlyAdmin {
+    require(isBridgeExecutor(executor), "Not a bridge executor");
+    operating_limits[executor] = operating_limit;
   }
 
   function set_fee(uint _fee_percent, uint _minimum_fee_amount) external onlyAdmin {
