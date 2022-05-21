@@ -176,6 +176,12 @@ contract JaxBscBridge {
     string calldata deposit_tx_hash
   ) external onlyVerifier {
     Request storage request = requests[request_id];
+    require(request.status == RequestStatus.Proved, "Invalid status");
+    require(request.shard_id == shard_id, "Incorrect shard id");
+    require(request.deposit_address_id == deposit_address_id, "Incorrect deposit address");
+    require(request.to == to, "Incorrect destination address");
+    require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Incorrect from");
+    require(request.amount == amount, "Incorrect amount");
     require(bytes(request.deposit_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;
     emit Add_Deposit_Hash(request_id, deposit_tx_hash);
