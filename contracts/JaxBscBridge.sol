@@ -18,10 +18,12 @@ contract JaxBscBridge {
 
   uint public penalty_amount = 0;
 
-  address public penalty_wallet;
-
+  address public penalty_wallet;  
+  
+  uint max_pending_audit_records;
+  uint pending_audit_records;  
+  
   IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
-
 
   enum RequestStatus {Init, Proved, Rejected, Expired, Released}
 
@@ -203,7 +205,8 @@ contract JaxBscBridge {
     require(request.to == to, "destination address mismatch");
     require(bytes(request.deposit_tx_hash).length > 0, "Request is not verified");
     require(keccak256(abi.encodePacked(request.deposit_tx_hash)) == keccak256(abi.encodePacked(deposit_tx_hash)), "Deposit tx hash mismatch");
-    
+    require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
+    pending_audit_records += 1;
     request.amount = amount;
     request.status = RequestStatus.Released;
     proccessed_txd_hashes[request.txdHash] = true;
@@ -236,6 +239,7 @@ contract JaxBscBridge {
     require(bytes(request.release_tx_link).length == 0, "");
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
+    pending_audit_records -= 1;
     emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 
@@ -243,6 +247,7 @@ contract JaxBscBridge {
     Request storage request = requests[request_id];
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
+    pending_audit_records -= 1;
     emit Update_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 

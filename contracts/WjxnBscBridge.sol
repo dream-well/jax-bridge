@@ -18,7 +18,10 @@ contract WjxnBscBridge {
 
   uint public penalty_amount = 0;
 
-  address public penalty_wallet;
+  address public penalty_wallet;  
+  
+  uint max_pending_audit_records;
+  uint pending_audit_records;
 
   IERC20 public wjxn = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
 
@@ -187,6 +190,7 @@ contract WjxnBscBridge {
     require(bytes(request.release_tx_link).length == 0, "");
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
+    pending_audit_records -= 1;
     emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 
@@ -194,6 +198,7 @@ contract WjxnBscBridge {
     Request storage request = requests[request_id];
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
+    pending_audit_records -= 1;
     emit Update_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
   }
 
