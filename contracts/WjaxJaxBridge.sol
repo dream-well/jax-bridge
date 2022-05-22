@@ -55,6 +55,7 @@ contract WjaxJaxBridge {
   mapping(address => address) fee_wallets;
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
+  mapping(bytes32 => bool) valid_data_hashes;
 
   event Deposit(uint request_id, uint shard_id, uint amount, uint fee_amount, address from, string to);
   event Release(uint request_id, string to, uint amount, string txHash);

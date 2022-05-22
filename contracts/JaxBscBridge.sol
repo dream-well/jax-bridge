@@ -184,7 +184,7 @@ contract JaxBscBridge {
     address to,
     string memory from,
     string memory deposit_tx_hash
-  ) pure internal returns (bytes32) {
+  ) pure public returns (bytes32) {
     return keccak256(abi.encodePacked(
       request_id, 
       shard_id,
@@ -216,7 +216,6 @@ contract JaxBscBridge {
       to, 
       from, 
       deposit_tx_hash), "Incorrect data");
-    require(bytes(request.deposit_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;
     request.status = RequestStatus.Verified;
     valid_data_hashes[data_hash] = true;

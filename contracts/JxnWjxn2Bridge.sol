@@ -26,13 +26,14 @@ contract JxnWjxn2Bridge {
   IERC20 public wjxn2 = IERC20(0xe3345c59ECd8B9C157Dd182BA9500aace899AD31);
 
 
-  enum RequestStatus {Init, Proved, Rejected, Expired, Released}
+  enum RequestStatus {Init, Proved, Rejected, Expired, Verified, Released, Completed}
 
   struct Request {
     uint deposit_address_id;
     uint amount;
     bytes32 amount_hash;
     bytes32 txdHash;
+    bytes32 data_hash;
     uint valid_until;
     uint prove_timestamp;
     address to;
@@ -59,6 +60,7 @@ contract JxnWjxn2Bridge {
   mapping(address => address) fee_wallets;
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
+  mapping(bytes32 => bool) valid_data_hashes;
 
   event Create_Request(uint request_id, uint amount, string from, uint depoist_address_id, uint valid_until);
   event Prove_Request(uint request_id, string tx_hash);
@@ -66,7 +68,7 @@ contract JxnWjxn2Bridge {
   event Reject_Request(uint request_id);
   event Release(uint request_id, address from, uint amount);
   event Add_Deposit_Hash(uint request_id, string deposit_tx_hash);
-  event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
+  event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash, bytes32 info_hash);
   event Update_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Add_Penalty_Amount(uint amount, bytes32 info_hash);
@@ -161,13 +163,56 @@ contract JxnWjxn2Bridge {
     request.status = RequestStatus.Proved;
     request.prove_timestamp = block.timestamp;
     request.amount = 0;
+    request.data_hash = _get_data_hash(
+      request_id, 
+      request.deposit_address_id, 
+      request.amount, 
+      request.to, 
+      request.from, 
+      deposit_tx_hash);
     emit Prove_Request(request_id, deposit_tx_hash);
   }
 
-  function add_data_hash(uint request_id, string calldata deposit_tx_hash) external onlyVerifier {
+  function _get_data_hash(
+    uint request_id, 
+    uint deposit_address_id,
+    uint amount,
+    address to,
+    string memory from,
+    string memory deposit_tx_hash
+  ) pure public returns (bytes32) {
+    return keccak256(abi.encodePacked(
+      request_id, 
+      deposit_address_id,
+      amount,
+      to,
+      from,
+      deposit_tx_hash
+    ));
+  }
+
+  function add_data_hash(
+    uint request_id,
+    uint amount, 
+    uint deposit_address_id, 
+    address to, 
+    string calldata from, 
+    string calldata deposit_tx_hash,
+    bytes32 data_hash
+  ) external onlyVerifier {
     Request storage request = requests[request_id];
+    require(request.status == RequestStatus.Proved, "Invalid status");
+    require(data_hash == request.data_hash && request.data_hash == _get_data_hash(
+      request_id,  
+      deposit_address_id, 
+      amount, 
+      to, 
+      from, 
+      deposit_tx_hash), "Incorrect data");
     require(bytes(request.deposit_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;
+    request.status = RequestStatus.Verified;
+    valid_data_hashes[data_hash] = true;
     emit Add_Deposit_Hash(request_id, deposit_tx_hash);
   }
 
@@ -180,24 +225,27 @@ contract JxnWjxn2Bridge {
 
   function release(
     uint request_id,
-    uint amount,
-    string calldata from,
-    address to,
+    uint shard_id, 
+    uint amount, 
+    uint deposit_address_id, 
+    address to, 
+    string calldata from, 
     string calldata deposit_tx_hash
   ) external onlyExecutor {
     Request storage request = requests[request_id];
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
-    require(request.status == RequestStatus.Proved, "Invalid status");
-    require(request.txdHash == keccak256(abi.encodePacked(deposit_tx_hash)), "Invalid deposit_tx_hash");
+    require(request.status == RequestStatus.Verified, "Invalid status");
+    require(request.data_hash == _get_data_hash(
+      request_id, 
+      deposit_address_id, 
+      amount, 
+      to, 
+      from, 
+      deposit_tx_hash), "Incorrect data");
+    require(valid_data_hashes[request.data_hash], "Invalid data hash");
     require(proccessed_txd_hashes[request.txdHash] == false, "Txd hash already processed");
-    require(request.amount_hash == keccak256(abi.encodePacked(request_id, amount)), "Incorrect amount");
-    require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Sender's address mismatch");
-    require(request.to == to, "destination address mismatch");
-    require(bytes(request.deposit_tx_hash).length > 0, "Request is not verified");
-    require(keccak256(abi.encodePacked(request.deposit_tx_hash)) == keccak256(abi.encodePacked(deposit_tx_hash)), "Deposit tx hash mismatch");
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
-    deposit_address_locktimes[request.deposit_address_id] = 0;
     request.amount = amount;
     request.status = RequestStatus.Released;
     proccessed_txd_hashes[request.txdHash] = true;
@@ -223,16 +271,33 @@ contract JxnWjxn2Bridge {
     emit Release(request_id, request.to, request.amount - fee_amount);
   }
 
-
-  function complete_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAuditor {
+  function complete_release_tx_link(
+    uint request_id, 
+    uint amount, 
+    uint deposit_address_id, 
+    address to, 
+    string calldata from, 
+    string calldata deposit_tx_hash,
+    string calldata deposit_tx_link, 
+    string calldata release_tx_link,
+    bytes32 info_hash
+    ) external onlyAuditor {
     Request storage request = requests[request_id];
-    require(bytes(request.deposit_tx_link).length == 0, "");
-    require(bytes(request.release_tx_link).length == 0, "");
+    require(request.status == RequestStatus.Released, "Invalid status");
+    require(request.data_hash == _get_data_hash(
+      request_id, 
+      deposit_address_id, 
+      amount, 
+      to, 
+      from, 
+      deposit_tx_hash), "Incorrect data");
+    request.status = RequestStatus.Completed;
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
     pending_audit_records -= 1;
-    emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
+    emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link, info_hash);
   }
+
 
   function update_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAdmin {
     Request storage request = requests[request_id];
