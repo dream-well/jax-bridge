@@ -139,7 +139,7 @@ contract WjaxBscBridge {
     uint amount,
     uint fee_amount,
     bytes32 data_hash,
-    string calldata deposit_tx_hash
+    string memory deposit_tx_hash
   ) external onlyVerifier {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     require( data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_tx_hash), "Incorrect deposit hash");
@@ -170,7 +170,7 @@ contract WjaxBscBridge {
     uint amount,
     uint fee_amount,
     bytes32 data_hash,
-    string calldata txHash
+    string memory txHash
   ) external onlyExecutor {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     require( data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, txHash), "Incorrect deposit hash");
@@ -210,9 +210,9 @@ contract WjaxBscBridge {
     uint amount,
     uint fee_amount,
     bytes32 data_hash,
-    string calldata deposit_tx_hash,
-    string calldata deposit_tx_link, 
-    string calldata release_tx_link,
+    string memory deposit_tx_hash,
+    string memory deposit_tx_link, 
+    string memory release_tx_link,
     bytes32 info_hash
   ) external onlyAuditor {
     Request storage request = requests[request_id];
@@ -227,7 +227,7 @@ contract WjaxBscBridge {
     emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link, info_hash);
   }
 
-  function update_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAdmin {
+  function update_release_tx_link(uint request_id, string memory deposit_tx_link, string memory release_tx_link) external onlyAdmin {
     Request storage request = requests[request_id];
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;

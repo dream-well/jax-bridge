@@ -97,7 +97,7 @@ contract wjxn2JaxBridge {
     _;
   }
 
-  function deposit(uint amount, string calldata to) external 
+  function deposit(uint amount, string memory to) external 
   {
     require(amount > minimum_fee_amount, "Below minimum amount");
     uint request_id = requests.length;
@@ -136,8 +136,8 @@ contract wjxn2JaxBridge {
     uint request_id,
     uint amount,
     address from,
-    string calldata to,
-    string calldata deposit_tx_hash,
+    string memory to,
+    string memory deposit_tx_hash,
     bytes32 data_hash
   ) external onlyVerifier {
     Request storage request = requests[request_id];
@@ -153,9 +153,9 @@ contract wjxn2JaxBridge {
     uint request_id,
     uint amount,
     address from,
-    string calldata to,
-    string calldata deposit_tx_hash,
-    string calldata jaxnet_tx_hash
+    string memory to,
+    string memory deposit_tx_hash,
+    string memory jaxnet_tx_hash
   ) external onlyExecutor {
     Request storage request = requests[request_id];
     bytes32 jaxnet_txd_hash = keccak256(abi.encodePacked(jaxnet_tx_hash));
@@ -196,10 +196,10 @@ contract wjxn2JaxBridge {
     uint request_id,
     uint amount,
     address from,
-    string calldata to,
-    string calldata deposit_tx_hash,
-    string calldata deposit_tx_link, 
-    string calldata release_tx_link,
+    string memory to,
+    string memory deposit_tx_hash,
+    string memory deposit_tx_link, 
+    string memory release_tx_link,
     bytes32 info_hash
   ) external onlyAuditor {
     Request storage request = requests[request_id];
@@ -214,7 +214,7 @@ contract wjxn2JaxBridge {
     emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link, info_hash);
   }
 
-  function update_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAdmin {
+  function update_release_tx_link(uint request_id, string memory deposit_tx_link, string memory release_tx_link) external onlyAdmin {
     Request storage request = requests[request_id];
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;

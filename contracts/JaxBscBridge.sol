@@ -123,7 +123,7 @@ contract JaxBscBridge {
     revert("All deposit addresses are in use");
   }
 
-  function create_request(uint shard_id, uint amount, uint deposit_address_id, address to, string calldata from) external 
+  function create_request(uint shard_id, uint amount, uint deposit_address_id, address to, string memory from) external 
     isValidDepositAddress(deposit_address_id)
   {
     require(to == msg.sender, "destination address should be sender");
@@ -148,7 +148,7 @@ contract JaxBscBridge {
     emit Create_Request(request_id, shard_id, amount, from, deposit_address_id, valid_until);
   }
 
-  function prove_request(uint request_id, string calldata tx_hash) external {
+  function prove_request(uint request_id, string memory tx_hash) external {
     Request storage request = requests[request_id];
     require(request.to == msg.sender, "Invalid account");
     require(request.status == RequestStatus.Init, "Invalid status");
@@ -201,8 +201,8 @@ contract JaxBscBridge {
     uint amount, 
     uint deposit_address_id, 
     address to, 
-    string calldata from, 
-    string calldata deposit_tx_hash,
+    string memory from, 
+    string memory deposit_tx_hash,
     bytes32 data_hash
   ) external onlyVerifier {
     Request storage request = requests[request_id];
@@ -233,8 +233,8 @@ contract JaxBscBridge {
     uint amount, 
     uint deposit_address_id, 
     address to, 
-    string calldata from, 
-    string calldata deposit_tx_hash
+    string memory from, 
+    string memory deposit_tx_hash
   ) external onlyExecutor {
     Request storage request = requests[request_id];
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
@@ -281,10 +281,10 @@ contract JaxBscBridge {
     uint amount, 
     uint deposit_address_id, 
     address to, 
-    string calldata from, 
-    string calldata deposit_tx_hash,
-    string calldata deposit_tx_link, 
-    string calldata release_tx_link,
+    string memory from, 
+    string memory deposit_tx_hash,
+    string memory deposit_tx_link, 
+    string memory release_tx_link,
     bytes32 info_hash
     ) external onlyAuditor {
     Request storage request = requests[request_id];
@@ -304,7 +304,7 @@ contract JaxBscBridge {
     emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link, info_hash);
   }
 
-  function update_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAdmin {
+  function update_release_tx_link(uint request_id, string memory deposit_tx_link, string memory release_tx_link) external onlyAdmin {
     Request storage request = requests[request_id];
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
