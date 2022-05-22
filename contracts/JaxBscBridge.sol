@@ -118,7 +118,7 @@ contract JaxBscBridge {
 
   function get_free_deposit_address_id() external view returns(uint) {
     for(uint i = 0; i < deposit_address_locktimes.length; i += 1) {
-      if(deposit_address_deleted[i] == false && deposit_address_locktimes[i] == 0) return i;
+      if(deposit_address_deleted[i] == false && deposit_address_locktimes[id] == 0) return i;
     }
     revert("All deposit addresses are in use");
   }
@@ -419,7 +419,7 @@ contract JaxBscBridge {
     uint id;
     for(uint i = 0; i < ids.length; i += 1) {
       id = ids[i];
-      require(deposit_address_locktimes[i] == 0, "Active deposit address");
+      require(deposit_address_locktimes[id] == 0, "Active deposit address");
       deposit_address_deleted[id] = true;
     }
   }

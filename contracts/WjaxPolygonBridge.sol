@@ -27,7 +27,7 @@ contract WjaxPolygonBridge {
   
   IERC20 public wjax = IERC20(0x2b66837c742fcA971bF4261d6AfEB67d66E32BdD);
 
-  enum RequestStatus {Init, Proved, Verified, Released, Completed}
+  enum RequestStatus {Init, Verified, Released, Completed}
 
   struct Request {
     uint src_chain_id;
