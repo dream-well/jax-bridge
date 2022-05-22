@@ -60,6 +60,7 @@ contract JaxBscBridge {
   mapping(address => address) fee_wallets;
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
+  mapping(bytes32 => bool) valid_data_hashes;
 
   event Create_Request(uint request_id, uint shard_id, uint amount, string from, uint depoist_address_id, uint valid_until);
   event Prove_Request(uint request_id, string tx_hash);
@@ -202,11 +203,12 @@ contract JaxBscBridge {
     uint deposit_address_id, 
     address to, 
     string calldata from, 
-    string calldata deposit_tx_hash
+    string calldata deposit_tx_hash,
+    bytes32 data_hash
   ) external onlyVerifier {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Proved, "Invalid status");
-    require(request.data_hash == _get_data_hash(
+    require(data_hash == request.data_hash && request.data_hash == _get_data_hash(
       request_id, 
       shard_id, 
       deposit_address_id, 
@@ -217,6 +219,7 @@ contract JaxBscBridge {
     require(bytes(request.deposit_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;
     request.status = RequestStatus.Verified;
+    valid_data_hashes[data_hash] = true;
     emit Add_Deposit_Hash(request_id, deposit_tx_hash);
   }
 
@@ -247,12 +250,8 @@ contract JaxBscBridge {
       to, 
       from, 
       deposit_tx_hash), "Incorrect data");
+    require(valid_data_hashes[request.data_hash], "Invalid data hash");
     require(proccessed_txd_hashes[request.txdHash] == false, "Txd hash already processed");
-    require(request.amount_hash == keccak256(abi.encodePacked(request_id, amount)), "Incorrect amount");
-    require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Sender's address mismatch");
-    require(request.to == to, "destination address mismatch");
-    require(bytes(request.deposit_tx_hash).length > 0, "Request is not verified");
-    require(keccak256(abi.encodePacked(request.deposit_tx_hash)) == keccak256(abi.encodePacked(deposit_tx_hash)), "Deposit tx hash mismatch");
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
     request.amount = amount;
