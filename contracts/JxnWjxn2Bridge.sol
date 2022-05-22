@@ -60,7 +60,6 @@ contract JxnWjxn2Bridge {
   mapping(address => address) fee_wallets;
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
-  mapping(bytes32 => bool) valid_data_hashes;
 
   event Create_Request(uint request_id, uint amount, string from, uint depoist_address_id, uint valid_until);
   event Prove_Request(uint request_id, string tx_hash);
@@ -212,7 +211,6 @@ contract JxnWjxn2Bridge {
     require(bytes(request.deposit_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;
     request.status = RequestStatus.Verified;
-    valid_data_hashes[data_hash] = true;
     emit Add_Deposit_Hash(request_id, deposit_tx_hash);
   }
 
@@ -242,7 +240,6 @@ contract JxnWjxn2Bridge {
       to, 
       from, 
       deposit_tx_hash), "Incorrect data");
-    require(valid_data_hashes[request.data_hash], "Invalid data hash");
     require(proccessed_txd_hashes[request.txdHash] == false, "Txd hash already processed");
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
