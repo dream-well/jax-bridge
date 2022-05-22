@@ -14,7 +14,7 @@ contract WjaxBscBridge {
   uint chainId;
   
   uint public fee_percent = 5e5; // 0.5 %
-  uint public minimum_fee_amount = 50; // 50 wjax
+  uint public minimum_fee_amount = 50 * 1e4; // 50 wjax
 
   address public admin;
 
