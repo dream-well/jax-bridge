@@ -229,15 +229,24 @@ contract JaxBscBridge {
 
   function release(
     uint request_id,
-    uint amount,
-    string calldata from,
-    address to,
+    uint shard_id, 
+    uint amount, 
+    uint deposit_address_id, 
+    address to, 
+    string calldata from, 
     string calldata deposit_tx_hash
   ) external onlyExecutor {
     Request storage request = requests[request_id];
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
-    require(request.status == RequestStatus.Proved, "Invalid status");
-    require(request.txdHash == keccak256(abi.encodePacked(deposit_tx_hash)), "Invalid deposit_tx_hash");
+    require(request.status == RequestStatus.Verified, "Invalid status");
+    require(request.data_hash == _get_data_hash(
+      request_id, 
+      shard_id, 
+      deposit_address_id, 
+      amount, 
+      to, 
+      from, 
+      deposit_tx_hash), "Incorrect data");
     require(proccessed_txd_hashes[request.txdHash] == false, "Txd hash already processed");
     require(request.amount_hash == keccak256(abi.encodePacked(request_id, amount)), "Incorrect amount");
     require(keccak256(abi.encodePacked(request.from)) == keccak256(abi.encodePacked(from)), "Sender's address mismatch");
