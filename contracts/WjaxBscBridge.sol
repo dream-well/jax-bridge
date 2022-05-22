@@ -43,15 +43,12 @@ contract WjaxBscBridge {
 
   Request[] public requests;
 
-  mapping(address => uint[]) public user_requests;
-
   address[] public auditors;
   address[] public verifiers;
   address[] public bridge_executors;
   mapping(address => uint) operating_limits;
   mapping(address => address) fee_wallets;
 
-  mapping(bytes32 => bool) valid_data_hashes;
   mapping(bytes32 => bool) proccessed_data_hashes;
   mapping(bytes32 => bool) proccessed_tx_hashes;
 
@@ -70,7 +67,7 @@ contract WjaxBscBridge {
     string txHash
   );
   event Add_data_hash(uint request_id, string deposit_tx_hash);
-  event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
+  event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash, bytes32 info_hash);
   event Update_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Reject_Request(uint request_id);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
@@ -148,8 +145,6 @@ contract WjaxBscBridge {
     require( data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_tx_hash), "Incorrect deposit hash");
     bytes32 _deposit_tx_hash = keccak256(abi.encodePacked(deposit_tx_hash));
     require( !proccessed_data_hashes[data_hash] && !proccessed_tx_hashes[_deposit_tx_hash], "Already processed" );
-    require( !valid_data_hashes[data_hash], "Already set" );
-    valid_data_hashes[data_hash] = true;
     Request memory request = Request({
       src_chain_id: chainId,
       dest_chain_id: dest_chain_id,
@@ -182,7 +177,6 @@ contract WjaxBscBridge {
     bytes32 _txHash = keccak256(abi.encodePacked(txHash));
     Request storage request = foreign_requests[data_hash];
     require( request.status == RequestStatus.Verified, "Already processed" );
-    require(valid_data_hashes[data_hash], "Deposit is not valid");
     require(operating_limits[msg.sender] >= amount, "Out of operating limit");
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
@@ -218,7 +212,8 @@ contract WjaxBscBridge {
     bytes32 data_hash,
     string calldata deposit_tx_hash,
     string calldata deposit_tx_link, 
-    string calldata release_tx_link
+    string calldata release_tx_link,
+    bytes32 info_hash
   ) external onlyAuditor {
     Request storage request = requests[request_id];
     require( request.status == RequestStatus.Released, "Invalid status" );
@@ -229,7 +224,7 @@ contract WjaxBscBridge {
     request.release_tx_link = release_tx_link;
     pending_audit_records -= 1;
     request.status = RequestStatus.Completed;
-    emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
+    emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link, info_hash);
   }
 
   function update_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAdmin {
