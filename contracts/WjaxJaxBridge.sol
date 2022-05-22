@@ -22,8 +22,8 @@ contract WjaxJaxBridge {
 
   address public penalty_wallet;  
   
-  uint max_pending_audit_records = 10;
-  uint pending_audit_records;
+  uint public max_pending_audit_records = 10;
+  uint public pending_audit_records;
 
   IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74); 
 
@@ -52,8 +52,8 @@ contract WjaxJaxBridge {
   address[] public auditors;
   address[] public verifiers;
   address[] public bridge_executors;
-  mapping(address => uint) operating_limits;
-  mapping(address => address) fee_wallets;
+  mapping(address => uint) public operating_limits;
+  mapping(address => address) public fee_wallets;
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
 

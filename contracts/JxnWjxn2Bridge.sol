@@ -20,8 +20,8 @@ contract JxnWjxn2Bridge {
 
   address public penalty_wallet;  
   
-  uint max_pending_audit_records = 10;
-  uint pending_audit_records;
+  uint public max_pending_audit_records = 10;
+  uint public pending_audit_records;
 
   IERC20 public wjxn2 = IERC20(0xe3345c59ECd8B9C157Dd182BA9500aace899AD31);
 
@@ -56,8 +56,8 @@ contract JxnWjxn2Bridge {
   address[] public auditors;
   address[] public verifiers;
   address[] public bridge_executors;
-  mapping(address => uint) operating_limits;
-  mapping(address => address) fee_wallets;
+  mapping(address => uint) public operating_limits;
+  mapping(address => address) public fee_wallets;
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
 

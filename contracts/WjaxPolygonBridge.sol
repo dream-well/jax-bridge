@@ -22,8 +22,8 @@ contract WjaxPolygonBridge {
 
   address public penalty_wallet;  
   
-  uint max_pending_audit_records = 10;
-  uint pending_audit_records;
+  uint public max_pending_audit_records = 10;
+  uint public pending_audit_records;
   
   IERC20 public wjax = IERC20(0x2b66837c742fcA971bF4261d6AfEB67d66E32BdD);
 
@@ -48,13 +48,12 @@ contract WjaxPolygonBridge {
   address[] public auditors;
   address[] public verifiers;
   address[] public bridge_executors;
-  mapping(address => uint) operating_limits;
-  mapping(address => address) fee_wallets;
+  mapping(address => uint) public operating_limits;
+  mapping(address => address) public fee_wallets;
 
-  mapping(bytes32 => bool) proccessed_data_hashes;
-  mapping(bytes32 => bool) proccessed_tx_hashes;
+  mapping(bytes32 => bool) public proccessed_tx_hashes;
 
-  mapping(bytes32 => Request) foreign_requests;
+  mapping(bytes32 => Request) public foreign_requests;
 
   event Deposit(uint indexed request_id, bytes32 indexed data_hash, address indexed to, uint amount, uint fee_amount, uint64 src_chain_id, uint64 dest_chain_id, uint128 deposit_timestamp);
   event Release(
@@ -146,7 +145,6 @@ contract WjaxPolygonBridge {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     require( data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_tx_hash), "Incorrect deposit hash");
     bytes32 _deposit_tx_hash = keccak256(abi.encodePacked(deposit_tx_hash));
-    require( !proccessed_data_hashes[data_hash] && !proccessed_tx_hashes[_deposit_tx_hash], "Already processed" );
     Request memory request = Request({
       src_chain_id: chainId,
       dest_chain_id: dest_chain_id,
@@ -199,7 +197,6 @@ contract WjaxPolygonBridge {
     else {
       wjax.transfer(fee_wallets[msg.sender], fee_amount);
     }
-    proccessed_data_hashes[data_hash] = true;
     proccessed_tx_hashes[_txHash] = true;
     request.status = RequestStatus.Released;
     emit Release(request_id, data_hash, to, amount, fee_amount, amount - fee_amount, uint128(src_chain_id), uint128(dest_chain_id), txHash);
