@@ -132,7 +132,7 @@ contract WjaxPolygonBridge {
   }
 
 
-  function add_deposit_hash(
+  function add_data_hash(
     uint request_id,
     address to,
     uint src_chain_id,

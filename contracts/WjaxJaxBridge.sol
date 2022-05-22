@@ -118,7 +118,7 @@ contract WjaxJaxBridge {
     emit Deposit(request_id, shard_id, amount, fee_amount, msg.sender, to);
   }
 
-  function add_deposit_hash(uint request_id, string calldata deposit_tx_hash) external onlyVerifier {
+  function add_data_hash(uint request_id, string calldata deposit_tx_hash) external onlyVerifier {
     Request storage request = requests[request_id];
     require(bytes(request.deposit_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;

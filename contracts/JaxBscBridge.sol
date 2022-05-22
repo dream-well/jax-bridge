@@ -25,7 +25,7 @@ contract JaxBscBridge {
   
   IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
 
-  enum RequestStatus {Init, Proved, Rejected, Expired, Released}
+  enum RequestStatus {Init, Proved, Rejected, Expired, Verified, Released, Completed}
 
   struct Request {
     uint deposit_address_id;
@@ -171,7 +171,7 @@ contract JaxBscBridge {
       request.amount, 
       request.to, 
       request.from, 
-      request.deposit_tx_hash);
+      tx_hash);
     emit Prove_Request(request_id, tx_hash);
   }
 
@@ -195,7 +195,7 @@ contract JaxBscBridge {
     ));
   }
 
-  function add_deposit_hash(
+  function add_data_hash(
     uint request_id,
     uint shard_id, 
     uint amount, 
@@ -216,6 +216,7 @@ contract JaxBscBridge {
       deposit_tx_hash), "Incorrect data");
     require(bytes(request.deposit_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;
+    request.status = RequestStatus.Verified;
     emit Add_Deposit_Hash(request_id, deposit_tx_hash);
   }
 
@@ -292,8 +293,7 @@ contract JaxBscBridge {
       to, 
       from, 
       deposit_tx_hash), "Incorrect data");
-    require(bytes(request.deposit_tx_link).length == 0, "");
-    require(bytes(request.release_tx_link).length == 0, "");
+    request.status = RequestStatus.Completed;
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
     pending_audit_records -= 1;
