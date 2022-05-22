@@ -144,7 +144,6 @@ contract WjaxPolygonBridge {
   ) external onlyVerifier {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     require( data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_tx_hash), "Incorrect deposit hash");
-    bytes32 _deposit_tx_hash = keccak256(abi.encodePacked(deposit_tx_hash));
     Request memory request = Request({
       src_chain_id: chainId,
       dest_chain_id: dest_chain_id,
