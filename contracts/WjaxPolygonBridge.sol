@@ -9,7 +9,7 @@ interface IERC20 {
   function transferFrom(address, address, uint) external;
 }
 
-contract WjaxBscBridge {
+contract WjaxPolygonBridge {
 
   uint chainId;
   
