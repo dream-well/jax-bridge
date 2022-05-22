@@ -9,7 +9,7 @@ interface IERC20 {
   function transferFrom(address, address, uint) external;
 }
 
-contract Wjxn2JxnBridge {
+contract wjxn2JaxBridge {
 
   uint chainId;
   
@@ -27,14 +27,14 @@ contract Wjxn2JxnBridge {
 
   IERC20 public wjxn2 = IERC20(0xe3345c59ECd8B9C157Dd182BA9500aace899AD31); 
 
-
-  enum RequestStatus {Init, Released}
+  enum RequestStatus {Init, Verified, Released, Completed}
 
   struct Request {
     uint amount;
     uint fee_amount;
     uint created_at;
     uint released_at;
+    bytes32 data_hash;
     address from;
     RequestStatus status;
     string to;
@@ -55,12 +55,11 @@ contract Wjxn2JxnBridge {
   mapping(address => address) fee_wallets;
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
-  mapping(bytes32 => bool) valid_data_hashes;
 
   event Deposit(uint request_id, uint amount, uint fee_amount, address from, string to);
   event Release(uint request_id, string to, uint amount, string txHash);
   event Add_Deposit_Hash(uint request_id, string deposit_tx_hash);
-  event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
+  event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash, bytes32 info_hash);
   event Update_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
   event Add_Penalty_Amount(uint amount, bytes32 info_hash);
@@ -117,10 +116,36 @@ contract Wjxn2JxnBridge {
     emit Deposit(request_id, amount, fee_amount, msg.sender, to);
   }
 
-  function add_data_hash(uint request_id, string calldata deposit_tx_hash) external onlyVerifier {
+  function _get_data_hash(
+    uint request_id,
+    uint amount,
+    address from,
+    string memory to,
+    string memory deposit_tx_hash
+  ) pure public returns (bytes32) {
+    return keccak256(abi.encodePacked(
+      request_id, 
+      amount,
+      from,
+      to,
+      deposit_tx_hash
+    ));
+  }
+
+  function add_data_hash(
+    uint request_id,
+    uint amount,
+    address from,
+    string calldata to,
+    string calldata deposit_tx_hash,
+    bytes32 data_hash
+  ) external onlyVerifier {
     Request storage request = requests[request_id];
-    require(bytes(request.deposit_tx_hash).length == 0, "");
+    require( request.status == RequestStatus.Init, "Invalid status" );
+    require( data_hash == _get_data_hash(request_id, amount, from, to, deposit_tx_hash), "Incorrect deposit hash");
     request.deposit_tx_hash = deposit_tx_hash;
+    request.data_hash = data_hash;
+    request.status = RequestStatus.Verified;
     emit Add_Deposit_Hash(request_id, deposit_tx_hash);
   }
 
@@ -136,13 +161,10 @@ contract Wjxn2JxnBridge {
     bytes32 jaxnet_txd_hash = keccak256(abi.encodePacked(jaxnet_tx_hash));
     bytes32 local_txd_hash = keccak256(abi.encodePacked(deposit_tx_hash));
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
-    require(request.amount == amount, "Incorrect amount");
-    require(request.status == RequestStatus.Init, "Invalid status");
-    require(request.from == from, "Invalid sender address");
-    require(keccak256(abi.encodePacked(request.to)) == keccak256(abi.encodePacked(to)), "Destination address mismatch");
+    require(request.status == RequestStatus.Verified, "Invalid status");
+    require(request.data_hash == _get_data_hash(request_id, amount, from, to, deposit_tx_hash), "Incorrect deposit hash");
     require(proccessed_txd_hashes[jaxnet_txd_hash] == false, "Jaxnet TxHash already used");
     require(proccessed_txd_hashes[local_txd_hash] == false, "Local TxHash already used");
-    require(bytes(request.deposit_tx_hash).length > 0, "Request is not verified");
     require(keccak256(abi.encodePacked(request.deposit_tx_hash)) == keccak256(abi.encodePacked(deposit_tx_hash)), "Deposit tx hash mismatch");
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
@@ -170,14 +192,26 @@ contract Wjxn2JxnBridge {
     emit Release(request_id, request.to, request.amount, jaxnet_tx_hash);
   }
 
-  function complete_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAuditor {
+  function complete_release_tx_link(
+    uint request_id,
+    uint amount,
+    address from,
+    string calldata to,
+    string calldata deposit_tx_hash,
+    string calldata deposit_tx_link, 
+    string calldata release_tx_link,
+    bytes32 info_hash
+  ) external onlyAuditor {
     Request storage request = requests[request_id];
-    require(bytes(request.deposit_tx_link).length == 0, "");
-    require(bytes(request.release_tx_link).length == 0, "");
+    
+    require(request.status == RequestStatus.Released, "Invalid status");
+    require(request.data_hash == _get_data_hash(request_id, amount, from, to, deposit_tx_hash), "Incorrect deposit hash");
+    
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
+    request.status = RequestStatus.Completed;
     pending_audit_records -= 1;
-    emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link);
+    emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link, info_hash);
   }
 
   function update_release_tx_link(uint request_id, string calldata deposit_tx_link, string calldata release_tx_link) external onlyAdmin {
@@ -189,6 +223,16 @@ contract Wjxn2JxnBridge {
 
   function get_user_requests(address user) external view returns(uint[] memory) {
     return user_requests[user];
+  }
+
+  function add_bridge_executor(address executor, uint operating_limit, address fee_wallet) external onlyAdmin {
+    for(uint i = 0; i < bridge_executors.length; i += 1) {
+      if(bridge_executors[i] == executor)
+        revert("Already exists");
+    }
+    bridge_executors.push(executor);
+    operating_limits[executor] = operating_limit;
+    fee_wallets[executor] = fee_wallet;
   }
 
   function add_auditor(address auditor) external onlyAdmin {
@@ -248,16 +292,6 @@ contract Wjxn2JxnBridge {
     return false;
   }
 
-  function add_bridge_executor(address executor, uint operating_limit, address fee_wallet) external onlyAdmin {
-    for(uint i = 0; i < bridge_executors.length; i += 1) {
-      if(bridge_executors[i] == executor)
-        revert("Already exists");
-    }
-    bridge_executors.push(executor);
-    operating_limits[executor] = operating_limit;
-    fee_wallets[executor] = fee_wallet;
-  }
-
   function isBridgeExecutor(address executor) public view returns(bool) {
     uint i = 0;
     for(; i < bridge_executors.length; i += 1) {
@@ -301,4 +335,5 @@ contract Wjxn2JxnBridge {
       IERC20(token).transfer(msg.sender, amount);
       emit Withdraw_By_Admin(token, amount);
   }
+
 }
