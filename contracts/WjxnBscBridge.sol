@@ -163,6 +163,8 @@ contract WjxnBscBridge {
     require( proccessed_deposit_hashes[deposit_hash] == false && proccessed_tx_hashes[_txHash] == false, "Already processed" );
     require(valid_deposit_hashes[deposit_hash], "Deposit is not valid");
     require(operating_limits[msg.sender] >= amount, "Out of operating limit");
+    require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
+    pending_audit_records += 1;
     operating_limits[msg.sender] -= amount;
     wjxn.transfer(to, amount - fee_amount);
     if(penalty_amount > 0) {

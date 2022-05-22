@@ -167,7 +167,9 @@ contract WjaxPolygonBridge {
     bytes32 _txHash = keccak256(abi.encodePacked(txHash));
     require( proccessed_deposit_hashes[deposit_hash] == false && proccessed_tx_hashes[_txHash] == false, "Already processed" );
     require(valid_deposit_hashes[deposit_hash], "Deposit is not valid");
-    require(operating_limits[msg.sender] >= amount, "Out of operating limit");
+    require(operating_limits[msg.sender] >= amount, "Out of operating limit");    
+    require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
+    pending_audit_records += 1;
     operating_limits[msg.sender] -= amount;
     wjax.mint(address(this), amount);
     wjax.transfer(to, amount - fee_amount);
