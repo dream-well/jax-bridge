@@ -1,7 +1,7 @@
 const { ethers, upgrades } = require("hardhat");
 
-// const contracts = ['JaxBscBridge', 'JxnWjxn2Bridge', 'WjaxBscBridge', 'Wjxn2JxnBridge', 'WjxnBscBridge'];
-const contracts = ['WjaxPolygonBridge'];
+const contracts = ['JaxBscBridge', 'JxnWjxn2Bridge', 'WjaxBscBridge', 'Wjxn2JxnBridge', 'WjxnBscBridge'];
+// const contracts = ['WjaxPolygonBridge'];
 
 void async function main() {
   const [owner] = await ethers.getSigners();

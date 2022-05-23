@@ -29,7 +29,6 @@ contract JxnWjxn2Bridge {
 
   struct Request {
     uint deposit_address_id;
-    uint shard_id;
     uint amount;
     bytes32 txdHash;
     bytes32 data_hash;
@@ -61,7 +60,7 @@ contract JxnWjxn2Bridge {
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
 
-  event Create_Request(uint request_id, uint shard_id, string from, uint depoist_address_id, uint valid_until);
+  event Create_Request(uint request_id, string from, uint depoist_address_id, uint valid_until);
   event Prove_Request(uint request_id, string tx_hash);
   event Expire_Request(uint request_id);
   event Reject_Request(uint request_id);
@@ -127,14 +126,12 @@ contract JxnWjxn2Bridge {
       deposit_address_locktimes[deposit_addresses[deposit_address_id]] == 0;
   }
 
-  function create_request(uint shard_id, uint deposit_address_id, uint amount, string memory from) external 
+  function create_request(uint deposit_address_id, uint amount, string memory from) external 
   {
-    require(shard_id >= 1 && shard_id <= 3, "Invalid shard id");
     require(isValidDepositAddress(deposit_address_id), "Invalid deposit address");
     require(amount > minimum_fee_amount, "Below minimum amount");
     uint request_id = requests.length;
     Request memory request;
-    request.shard_id = shard_id;
     request.amount = amount;
     request.to = msg.sender;
     request.from = from;
@@ -145,7 +142,7 @@ contract JxnWjxn2Bridge {
     deposit_address_locktimes[deposit_addresses[request.deposit_address_id]] = valid_until;
     requests.push(request);
     user_requests[msg.sender].push(request_id);
-    emit Create_Request(request_id, shard_id, from, request.deposit_address_id, valid_until);
+    emit Create_Request(request_id, from, request.deposit_address_id, valid_until);
   }
 
   function prove_request(uint request_id, string memory tx_hash) external {
@@ -165,7 +162,6 @@ contract JxnWjxn2Bridge {
     request.prove_timestamp = block.timestamp;
     request.data_hash = _get_data_hash(
       request_id, 
-      request.shard_id, 
       request.deposit_address_id, 
       request.amount, 
       request.to, 
@@ -177,7 +173,6 @@ contract JxnWjxn2Bridge {
 
   function _get_data_hash(
     uint request_id, 
-    uint shard_id,
     uint deposit_address_id,
     uint amount,
     address to,
@@ -186,7 +181,6 @@ contract JxnWjxn2Bridge {
   ) pure public returns (bytes32) {
     return keccak256(abi.encodePacked(
       request_id, 
-      shard_id,
       deposit_address_id,
       amount,
       to,
@@ -197,7 +191,7 @@ contract JxnWjxn2Bridge {
 
   function verify_data_hash(
     uint request_id,
-    uint shard_id, 
+    
     uint amount, 
     uint deposit_address_id, 
     address to, 
@@ -209,7 +203,6 @@ contract JxnWjxn2Bridge {
     require(request.status == RequestStatus.Proved, "Invalid status");
     require(data_hash == request.data_hash && request.data_hash == _get_data_hash(
       request_id, 
-      shard_id, 
       deposit_address_id, 
       amount, 
       to, 
@@ -231,7 +224,6 @@ contract JxnWjxn2Bridge {
 
   function release(
     uint request_id,
-    uint shard_id, 
     uint amount, 
     uint deposit_address_id, 
     address to, 
@@ -243,7 +235,6 @@ contract JxnWjxn2Bridge {
     require(request.status == RequestStatus.Verified, "Invalid status");
     require(request.data_hash == _get_data_hash(
       request_id, 
-      shard_id, 
       deposit_address_id, 
       amount, 
       to, 
@@ -280,7 +271,6 @@ contract JxnWjxn2Bridge {
 
   function complete_release_tx_link(
     uint request_id,
-    uint shard_id, 
     uint amount, 
     uint deposit_address_id, 
     address to, 
@@ -294,7 +284,6 @@ contract JxnWjxn2Bridge {
     require(request.status == RequestStatus.Released, "Invalid status");
     require(request.data_hash == _get_data_hash(
       request_id, 
-      shard_id, 
       deposit_address_id, 
       amount, 
       to, 
