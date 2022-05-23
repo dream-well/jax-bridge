@@ -22,7 +22,7 @@ contract WjaxPolygonBridge {
   uint public max_pending_audit_records = 10;
   uint public pending_audit_records;
 
-  IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
+  IERC20 public wjax = IERC20(0x2b66837c742fcA971bF4261d6AfEB67d66E32BdD);
 
   mapping(uint => uint) public fee_percent; // 8 decimals
   mapping(uint => uint) public minimum_fee_amount; 
