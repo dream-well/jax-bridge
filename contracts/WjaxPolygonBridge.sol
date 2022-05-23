@@ -22,13 +22,13 @@ contract WjaxPolygonBridge {
   uint public max_pending_audit_records = 10;
   uint public pending_audit_records;
 
-  IERC20 public wjax = IERC20(0x2b66837c742fcA971bF4261d6AfEB67d66E32BdD);
+  IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
 
   mapping(uint => uint) public fee_percent; // 8 decimals
   mapping(uint => uint) public minimum_fee_amount; 
 
 
-  enum RequestStatus {Init, Proved, Verified, Released, Completed}
+  enum RequestStatus {Init, Proved, Verified, Released, Completed, Rejected}
 
   struct Request {
     uint src_chain_id;
@@ -70,7 +70,8 @@ contract WjaxPolygonBridge {
     uint128 dest_chain_id, 
     string txHash
   );
-  event Verify_Data_Hash(uint request_id, string deposit_tx_hash);
+  event Verify_Data_Hash(bytes32 src_chain_data_hash);
+  event Reject_Bridge_Transaction(bytes32 src_chain_data_hash);
   event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash, bytes32 info_hash);
   event Update_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Reject_Request(uint request_id);
@@ -168,7 +169,26 @@ contract WjaxPolygonBridge {
       release_tx_link: ""
     });
     foreign_requests[src_chain_data_hash] = request;
-    emit Verify_Data_Hash(request_id, deposit_tx_hash);
+    emit Verify_Data_Hash(src_chain_data_hash);
+  }
+
+  function reject_bridge_transaction(
+    uint request_id,
+    address to,
+    uint src_chain_id,
+    uint dest_chain_id,
+    uint amount,
+    uint fee_amount,
+    uint timestamp,
+    string memory deposit_tx_hash
+  ) external onlyVerifier {
+    bytes32 src_chain_data_hash = _get_data_hash(request_id, to, src_chain_id, dest_chain_id, amount, fee_amount, timestamp);
+    bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
+    Request storage request = foreign_requests[src_chain_data_hash];
+    require( request.status == RequestStatus.Verified, "Invalid status" );
+    require( data_hash == request.data_hash, "Datahash mismatch" );
+    request.status = RequestStatus.Rejected;
+    emit Reject_Bridge_Transaction(src_chain_data_hash);
   }
 
   function release(

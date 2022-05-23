@@ -75,7 +75,7 @@ module.exports = {
     }
   },
   etherscan: {
-    apiKey: bscscanAPIkey
+    apiKey: polygonscanAPIkey
   },
   paths: {
     sources: "./contracts",
