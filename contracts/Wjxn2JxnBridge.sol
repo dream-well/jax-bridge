@@ -137,14 +137,16 @@ contract Wjxn2JxnBridge {
     uint amount,
     address from,
     string memory to,
-    string memory deposit_tx_hash,
-    bytes32 data_hash
+    string memory deposit_tx_hash
   ) external onlyVerifier {
     Request storage request = requests[request_id];
-    require( request.status == RequestStatus.Init, "Invalid status" );
-    require( data_hash == _get_data_hash(request_id, amount, from, to, deposit_tx_hash), "Incorrect deposit hash");
+    require( request.status == RequestStatus.Init, "Invalid status");
+    bytes32 data_hash = _get_data_hash(request_id, amount, from, to, deposit_tx_hash);
+    request.data_hash = _get_data_hash(request_id, request.amount, request.from, request.to, deposit_tx_hash);
+    require( data_hash == request.data_hash, "Invalid data hash");
+    bytes32 txDHash = keccak256(abi.encodePacked(deposit_tx_hash));
+    require( !proccessed_txd_hashes[txDHash], "Invalid deposit tx hash");
     request.deposit_tx_hash = deposit_tx_hash;
-    request.data_hash = data_hash;
     request.status = RequestStatus.Verified;
     emit Verify_Data_Hash(request_id, deposit_tx_hash);
   }
