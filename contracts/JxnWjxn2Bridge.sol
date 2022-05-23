@@ -7,7 +7,7 @@ interface IERC20 {
   function transfer(address, uint) external;
 }
 
-contract JaxBscBridge {
+contract JxnWjxn2Bridge {
 
   uint chainId;
   
