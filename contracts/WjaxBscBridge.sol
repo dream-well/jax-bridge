@@ -152,7 +152,7 @@ contract WjaxBscBridge {
     require( !proccessed_txd_hashes[txDHash], "Invalid deposit tx hash");
     bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
     Request memory request = Request({
-      src_chain_id: chainId,
+      src_chain_id: src_chain_id,
       dest_chain_id: dest_chain_id,
       amount: amount,
       fee_amount: fee_amount,
