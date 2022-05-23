@@ -3,8 +3,6 @@
 pragma solidity 0.8.11;
 
 interface IERC20 {
-  function mint(address, uint) external;
-  function burn(uint) external;
   function transfer(address, uint) external;
   function transferFrom(address, address, uint) external;
 }
@@ -13,9 +11,6 @@ contract WjaxPolygonBridge {
 
   uint chainId;
   
-  uint public fee_percent = 5e5; // 0.5 %
-  uint public minimum_fee_amount = 50 * 1e4; // 50 wjax
-
   address public admin;
 
   uint public penalty_amount = 0;
@@ -24,10 +19,14 @@ contract WjaxPolygonBridge {
   
   uint public max_pending_audit_records = 10;
   uint public pending_audit_records;
-  
+
   IERC20 public wjax = IERC20(0x2b66837c742fcA971bF4261d6AfEB67d66E32BdD);
 
-  enum RequestStatus {Init, Verified, Released, Completed}
+  mapping(uint => uint) public fee_percent; // 8 decimals
+  mapping(uint => uint) public minimum_fee_amount; 
+
+
+  enum RequestStatus {Init, Proved, Verified, Released, Completed}
 
   struct Request {
     uint src_chain_id;
@@ -36,6 +35,7 @@ contract WjaxPolygonBridge {
     uint fee_amount;
     address to;
     uint deposit_timestamp;
+    bytes32 src_chain_data_hash;
     bytes32 data_hash;
     RequestStatus status;
     string deposit_tx_hash;
@@ -51,14 +51,15 @@ contract WjaxPolygonBridge {
   mapping(address => uint) public operating_limits;
   mapping(address => address) public fee_wallets;
 
-  mapping(bytes32 => bool) public proccessed_tx_hashes;
+  mapping(bytes32 => bool) public proccessed_txd_hashes;
 
   mapping(bytes32 => Request) public foreign_requests;
 
   event Deposit(uint indexed request_id, bytes32 indexed data_hash, address indexed to, uint amount, uint fee_amount, uint64 src_chain_id, uint64 dest_chain_id, uint128 deposit_timestamp);
   event Release(
-    uint indexed request_id, 
-    bytes32 indexed data_hash, 
+    bytes32 indexed src_chain_data_hash, 
+    uint request_id, 
+    bytes32 data_hash, 
     address indexed to, 
     uint deposited_amount, 
     uint fee_amount,
@@ -107,12 +108,12 @@ contract WjaxPolygonBridge {
   }
 
   function deposit(uint dest_chain_id, uint amount) external {
-    require(amount >= minimum_fee_amount, "Minimum amount");
+    require(amount >= minimum_fee_amount[dest_chain_id], "Minimum amount");
     require(chainId != dest_chain_id, "Invalid Destnation network");
     uint request_id = requests.length;
-    uint fee_amount = amount * fee_percent / 1e8;
-    if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
-    bytes32 data_hash = keccak256(abi.encodePacked(request_id, msg.sender, chainId, dest_chain_id, amount, fee_amount, block.timestamp));
+    uint fee_amount = amount * fee_percent[dest_chain_id] / 1e8;
+    if(fee_amount < minimum_fee_amount[dest_chain_id]) fee_amount = minimum_fee_amount[dest_chain_id];
+    bytes32 src_chain_data_hash = _get_data_hash(request_id, msg.sender, chainId, dest_chain_id, amount, fee_amount, block.timestamp);
     Request memory request = Request({
       src_chain_id: chainId,
       dest_chain_id: dest_chain_id,
@@ -120,7 +121,8 @@ contract WjaxPolygonBridge {
       fee_amount: fee_amount,
       to: msg.sender,
       deposit_timestamp: block.timestamp,
-      data_hash: data_hash,
+      src_chain_data_hash: src_chain_data_hash,
+      data_hash: 0,
       status: RequestStatus.Init,
       deposit_tx_hash: "",
       deposit_tx_link: "",
@@ -128,7 +130,7 @@ contract WjaxPolygonBridge {
     });
     requests.push(request);
     wjax.transferFrom(msg.sender, address(this), amount);
-    emit Deposit(request_id, data_hash, msg.sender, amount, fee_amount, uint64(chainId), uint64(dest_chain_id), uint128(block.timestamp));
+    emit Deposit(request_id, src_chain_data_hash, msg.sender, amount, fee_amount, uint64(chainId), uint64(dest_chain_id), uint128(block.timestamp));
   }
 
 
@@ -139,11 +141,15 @@ contract WjaxPolygonBridge {
     uint dest_chain_id,
     uint amount,
     uint fee_amount,
-    bytes32 data_hash,
+    uint timestamp,
+    bytes32 src_chain_data_hash,
     string memory deposit_tx_hash
   ) external onlyVerifier {
     require( dest_chain_id == chainId, "Incorrect destination network" );
-    require( data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_tx_hash), "Incorrect deposit hash");
+    require( src_chain_data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, timestamp), "Incorrect data hash");
+    bytes32 txDHash = keccak256(abi.encodePacked(deposit_tx_hash));
+    require( !proccessed_txd_hashes[txDHash], "Invalid deposit tx hash");
+    bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
     Request memory request = Request({
       src_chain_id: chainId,
       dest_chain_id: dest_chain_id,
@@ -151,13 +157,14 @@ contract WjaxPolygonBridge {
       fee_amount: fee_amount,
       to: msg.sender,
       deposit_timestamp: block.timestamp,
+      src_chain_data_hash: src_chain_data_hash,
       data_hash: data_hash,
       status: RequestStatus.Verified,
       deposit_tx_hash: deposit_tx_hash,
       deposit_tx_link: "",
       release_tx_link: ""
     });
-    foreign_requests[data_hash] = request;
+    foreign_requests[src_chain_data_hash] = request;
     emit Verify_Data_Hash(request_id, deposit_tx_hash);
   }
 
@@ -168,19 +175,18 @@ contract WjaxPolygonBridge {
     uint dest_chain_id,
     uint amount,
     uint fee_amount,
-    bytes32 data_hash,
-    string memory txHash
+    uint timestamp,
+    string memory deposit_tx_hash
   ) external onlyExecutor {
     require( dest_chain_id == chainId, "Incorrect destination network" );
-    require( data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, txHash), "Incorrect deposit hash");
-    bytes32 _txHash = keccak256(abi.encodePacked(txHash));
-    Request storage request = foreign_requests[data_hash];
-    require( request.status == RequestStatus.Verified, "Already processed" );
+    bytes32 src_chain_data_hash = _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, timestamp);
+    Request storage request = foreign_requests[src_chain_data_hash];
+    require( request.status == RequestStatus.Verified, "Invalid status" );
+    require( keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash)) == request.data_hash, "Datahash mismatch" );
     require(operating_limits[msg.sender] >= amount, "Out of operating limit");
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
     operating_limits[msg.sender] -= amount;
-    wjax.mint(address(this), amount);
     wjax.transfer(to, amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
@@ -196,9 +202,9 @@ contract WjaxPolygonBridge {
     else {
       wjax.transfer(fee_wallets[msg.sender], fee_amount);
     }
-    proccessed_tx_hashes[_txHash] = true;
+    proccessed_txd_hashes[keccak256(abi.encodePacked(deposit_tx_hash))] = true;
     request.status = RequestStatus.Released;
-    emit Release(request_id, data_hash, to, amount, fee_amount, amount - fee_amount, uint128(src_chain_id), uint128(dest_chain_id), txHash);
+    emit Release(src_chain_data_hash, request_id, request.data_hash, to, amount, fee_amount, amount - fee_amount, uint128(src_chain_id), uint128(dest_chain_id), deposit_tx_hash);
   }
 
   function complete_release_tx_link(
@@ -208,16 +214,17 @@ contract WjaxPolygonBridge {
     uint dest_chain_id,
     uint amount,
     uint fee_amount,
-    bytes32 data_hash,
+    uint timestamp,
     string memory deposit_tx_hash,
     string memory deposit_tx_link, 
     string memory release_tx_link,
     bytes32 info_hash
   ) external onlyAuditor {
-    Request storage request = requests[request_id];
+    bytes32 src_chain_data_hash = _get_data_hash(request_id, to, src_chain_id, dest_chain_id, amount, fee_amount, timestamp);
+    bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
+    Request storage request = foreign_requests[src_chain_data_hash];
     require( request.status == RequestStatus.Released, "Invalid status" );
-    require( dest_chain_id == chainId, "Incorrect destination network" );
-    require( data_hash == _get_data_hash(request_id, to, src_chain_id, dest_chain_id, amount, fee_amount, deposit_tx_hash), "Incorrect deposit hash");
+    require( data_hash == request.data_hash, "Datahash mismatch" );
     
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
@@ -240,7 +247,7 @@ contract WjaxPolygonBridge {
     uint dest_chain_id,
     uint amount,
     uint fee_amount,
-    string memory deposit_tx_hash
+    uint timestamp
   ) pure public returns (bytes32) {
     return keccak256(abi.encodePacked(
       request_id,
@@ -249,7 +256,7 @@ contract WjaxPolygonBridge {
       dest_chain_id,
       amount,
       fee_amount,
-      deposit_tx_hash
+      timestamp
     ));
   }
 
@@ -334,9 +341,9 @@ contract WjaxPolygonBridge {
     operating_limits[executor] = operating_limit;
   }
 
-  function set_fee(uint _fee_percent, uint _minimum_fee_amount) external onlyAdmin {
-    fee_percent = _fee_percent;
-    minimum_fee_amount = _minimum_fee_amount;
+  function set_fee(uint dest_chain_id, uint _fee_percent, uint _minimum_fee_amount) external onlyAdmin {
+    fee_percent[dest_chain_id] = _fee_percent;
+    minimum_fee_amount[dest_chain_id] = _minimum_fee_amount;
     emit Set_Fee(_fee_percent, _minimum_fee_amount);
   }
 
