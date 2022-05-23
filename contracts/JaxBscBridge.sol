@@ -222,7 +222,9 @@ contract JaxBscBridge {
 
   function reject_request(uint request_id) external onlyVerifier {
     Request storage request = requests[request_id];
-    require(request.status == RequestStatus.Init || request.status == RequestStatus.Proved, "Invalid status");
+    require(request.status == RequestStatus.Init || 
+      request.status == RequestStatus.Proved ||
+      request.status == RequestStatus.Verified, "Invalid status");
     request.status = RequestStatus.Rejected;
     emit Reject_Request(request_id);
   }

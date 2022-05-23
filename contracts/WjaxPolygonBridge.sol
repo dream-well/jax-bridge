@@ -3,6 +3,8 @@
 pragma solidity 0.8.11;
 
 interface IERC20 {
+  function mint(address, uint) external;
+  function burn(uint) external;
   function transfer(address, uint) external;
   function transferFrom(address, address, uint) external;
 }
@@ -130,6 +132,7 @@ contract WjaxPolygonBridge {
     });
     requests.push(request);
     wjax.transferFrom(msg.sender, address(this), amount);
+    wjax.burn(amount);
     emit Deposit(request_id, src_chain_data_hash, msg.sender, amount, fee_amount, uint64(chainId), uint64(dest_chain_id), uint128(block.timestamp));
   }
 
@@ -187,6 +190,7 @@ contract WjaxPolygonBridge {
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
     operating_limits[msg.sender] -= amount;
+    wjax.mint(address(this), amount);
     wjax.transfer(to, amount - fee_amount);
     if(penalty_amount > 0) {
       if(penalty_amount > fee_amount) {
