@@ -31,7 +31,6 @@ contract JaxBscBridge {
     uint deposit_address_id;
     uint shard_id;
     uint amount;
-    bytes32 amount_hash;
     bytes32 txdHash;
     bytes32 data_hash;
     uint valid_until;
@@ -133,7 +132,6 @@ contract JaxBscBridge {
     Request memory request;
     request.shard_id = shard_id;
     request.amount = amount;
-    request.amount_hash = keccak256(abi.encodePacked(request_id, amount));
     request.to = to;
     request.from = from;
     require(deposit_address_locktimes.length > deposit_address_id, "deposit_address_id out of index");
@@ -250,6 +248,7 @@ contract JaxBscBridge {
     require(proccessed_txd_hashes[request.txdHash] == false, "Txd hash already processed");
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
+    deposit_address_locktimes[request.deposit_address_id] = 0;
     request.amount = amount;
     request.status = RequestStatus.Released;
     proccessed_txd_hashes[request.txdHash] = true;
