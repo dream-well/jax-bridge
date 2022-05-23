@@ -115,12 +115,13 @@ contract JaxBscBridge {
 
   function get_free_deposit_address_id() public view returns(uint) {
     for(uint i = 0; i < deposit_addresses.length; i += 1) {
-      if(deposit_address_deleted[deposit_addresses[i]] == false && deposit_address_locktimes[deposit_addresses[i]] == 0) return i;
+      if(deposit_address_deleted[deposit_addresses[i]] == false && deposit_address_locktimes[deposit_addresses[i]] == 0) 
+        return i;
     }
     revert("All deposit addresses are in use");
   }
 
-  function create_request(uint shard_id, uint amount, string memory from) external 
+  function create_request(uint shard_id, uint deposit_address_id, uint amount, string memory from) external 
   {
     require(shard_id >= 1 && shard_id <= 3, "Invalid shard id");
     require(amount > minimum_fee_amount, "Below minimum amount");
@@ -130,7 +131,7 @@ contract JaxBscBridge {
     request.amount = amount;
     request.to = msg.sender;
     request.from = from;
-    request.deposit_address_id = get_free_deposit_address_id();
+    request.deposit_address_id = deposit_address_id;
     deposit_address_requests[request.deposit_address_id] = request_id;
     uint valid_until = block.timestamp + 48 hours;
     request.valid_until = valid_until;
