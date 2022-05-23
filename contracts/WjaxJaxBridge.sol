@@ -59,7 +59,7 @@ contract WjaxJaxBridge {
 
   event Deposit(uint request_id, uint shard_id, uint amount, uint fee_amount, address from, string to);
   event Release(uint request_id, string to, uint amount, string txHash);
-  event Add_Deposit_Hash(uint request_id, string deposit_tx_hash);
+  event Verify_Data_Hash(uint request_id, string deposit_tx_hash);
   event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash, bytes32 info_hash);
   event Update_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Set_Fee(uint fee_percent, uint minimum_fee_amount);
@@ -137,7 +137,7 @@ contract WjaxJaxBridge {
     ));
   }
 
-  function add_data_hash(
+  function verify_data_hash(
     uint request_id,
     uint shard_id,
     uint amount,
@@ -152,7 +152,7 @@ contract WjaxJaxBridge {
     request.deposit_tx_hash = deposit_tx_hash;
     request.data_hash = data_hash;
     request.status = RequestStatus.Verified;
-    emit Add_Deposit_Hash(request_id, deposit_tx_hash);
+    emit Verify_Data_Hash(request_id, deposit_tx_hash);
   }
 
   function release(

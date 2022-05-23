@@ -67,7 +67,7 @@ contract WjaxPolygonBridge {
     uint128 dest_chain_id, 
     string txHash
   );
-  event Add_data_hash(uint request_id, string deposit_tx_hash);
+  event Verify_Data_Hash(uint request_id, string deposit_tx_hash);
   event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash, bytes32 info_hash);
   event Update_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash);
   event Reject_Request(uint request_id);
@@ -132,7 +132,7 @@ contract WjaxPolygonBridge {
   }
 
 
-  function add_data_hash(
+  function verify_data_hash(
     uint request_id,
     address to,
     uint src_chain_id,
@@ -158,7 +158,7 @@ contract WjaxPolygonBridge {
       release_tx_link: ""
     });
     foreign_requests[data_hash] = request;
-    emit Add_data_hash(request_id, deposit_tx_hash);
+    emit Verify_Data_Hash(request_id, deposit_tx_hash);
   }
 
   function release(
