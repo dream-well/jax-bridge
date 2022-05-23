@@ -34,6 +34,7 @@ contract WjaxBscBridge {
     uint fee_amount;
     address to;
     uint deposit_timestamp;
+    bytes32 src_chain_data_hash;
     bytes32 data_hash;
     RequestStatus status;
     string deposit_tx_hash;
@@ -49,14 +50,15 @@ contract WjaxBscBridge {
   mapping(address => uint) public operating_limits;
   mapping(address => address) public fee_wallets;
 
-  mapping(bytes32 => bool) public proccessed_tx_hashes;
+  mapping(bytes32 => bool) public proccessed_txd_hashes;
 
   mapping(bytes32 => Request) public foreign_requests;
 
   event Deposit(uint indexed request_id, bytes32 indexed data_hash, address indexed to, uint amount, uint fee_amount, uint64 src_chain_id, uint64 dest_chain_id, uint128 deposit_timestamp);
   event Release(
-    uint indexed request_id, 
-    bytes32 indexed data_hash, 
+    bytes32 indexed src_chain_data_hash, 
+    uint request_id, 
+    bytes32 data_hash, 
     address indexed to, 
     uint deposited_amount, 
     uint fee_amount,
@@ -110,7 +112,7 @@ contract WjaxBscBridge {
     uint request_id = requests.length;
     uint fee_amount = amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
-    bytes32 data_hash = keccak256(abi.encodePacked(request_id, msg.sender, chainId, dest_chain_id, amount, fee_amount, block.timestamp));
+    bytes32 src_chain_data_hash = _get_data_hash(request_id, msg.sender, chainId, dest_chain_id, amount, fee_amount, block.timestamp);
     Request memory request = Request({
       src_chain_id: chainId,
       dest_chain_id: dest_chain_id,
@@ -118,7 +120,8 @@ contract WjaxBscBridge {
       fee_amount: fee_amount,
       to: msg.sender,
       deposit_timestamp: block.timestamp,
-      data_hash: data_hash,
+      src_chain_data_hash: src_chain_data_hash,
+      data_hash: 0,
       status: RequestStatus.Init,
       deposit_tx_hash: "",
       deposit_tx_link: "",
@@ -126,7 +129,7 @@ contract WjaxBscBridge {
     });
     requests.push(request);
     wjax.transferFrom(msg.sender, address(this), amount);
-    emit Deposit(request_id, data_hash, msg.sender, amount, fee_amount, uint64(chainId), uint64(dest_chain_id), uint128(block.timestamp));
+    emit Deposit(request_id, src_chain_data_hash, msg.sender, amount, fee_amount, uint64(chainId), uint64(dest_chain_id), uint128(block.timestamp));
   }
 
 
@@ -137,11 +140,13 @@ contract WjaxBscBridge {
     uint dest_chain_id,
     uint amount,
     uint fee_amount,
-    bytes32 data_hash,
+    uint timestamp,
+    bytes32 src_chain_data_hash,
     string memory deposit_tx_hash
   ) external onlyVerifier {
     require( dest_chain_id == chainId, "Incorrect destination network" );
-    require( data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, deposit_tx_hash), "Incorrect deposit hash");
+    require( src_chain_data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, timestamp), "Incorrect data hash");
+    bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
     Request memory request = Request({
       src_chain_id: chainId,
       dest_chain_id: dest_chain_id,
@@ -149,13 +154,14 @@ contract WjaxBscBridge {
       fee_amount: fee_amount,
       to: msg.sender,
       deposit_timestamp: block.timestamp,
+      src_chain_data_hash: src_chain_data_hash,
       data_hash: data_hash,
       status: RequestStatus.Verified,
       deposit_tx_hash: deposit_tx_hash,
       deposit_tx_link: "",
       release_tx_link: ""
     });
-    foreign_requests[data_hash] = request;
+    foreign_requests[src_chain_data_hash] = request;
     emit Verify_Data_Hash(request_id, deposit_tx_hash);
   }
 
@@ -166,14 +172,15 @@ contract WjaxBscBridge {
     uint dest_chain_id,
     uint amount,
     uint fee_amount,
-    bytes32 data_hash,
-    string memory txHash
+    uint timestamp,
+    string memory deposit_tx_hash
   ) external onlyExecutor {
     require( dest_chain_id == chainId, "Incorrect destination network" );
-    require( data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, txHash), "Incorrect deposit hash");
-    bytes32 _txHash = keccak256(abi.encodePacked(txHash));
-    Request storage request = foreign_requests[data_hash];
-    require( request.status == RequestStatus.Verified, "Already processed" );
+    bytes32 src_chain_data_hash = _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, timestamp);
+    bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
+    bytes32 txDHash = keccak256(abi.encodePacked(deposit_tx_hash));
+    Request storage request = foreign_requests[src_chain_data_hash];
+    require( request.status == RequestStatus.Verified, "Invalid status" );
     require(operating_limits[msg.sender] >= amount, "Out of operating limit");
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
@@ -193,9 +200,9 @@ contract WjaxBscBridge {
     else {
       wjax.transfer(fee_wallets[msg.sender], fee_amount);
     }
-    proccessed_tx_hashes[_txHash] = true;
+    proccessed_txd_hashes[txDHash] = true;
     request.status = RequestStatus.Released;
-    emit Release(request_id, data_hash, to, amount, fee_amount, amount - fee_amount, uint128(src_chain_id), uint128(dest_chain_id), txHash);
+    emit Release(src_chain_data_hash, request_id, data_hash, to, amount, fee_amount, amount - fee_amount, uint128(src_chain_id), uint128(dest_chain_id), deposit_tx_hash);
   }
 
   function complete_release_tx_link(
@@ -205,16 +212,17 @@ contract WjaxBscBridge {
     uint dest_chain_id,
     uint amount,
     uint fee_amount,
-    bytes32 data_hash,
+    uint timestamp,
     string memory deposit_tx_hash,
     string memory deposit_tx_link, 
     string memory release_tx_link,
     bytes32 info_hash
   ) external onlyAuditor {
-    Request storage request = requests[request_id];
+    bytes32 src_chain_data_hash = _get_data_hash(request_id, to, src_chain_id, dest_chain_id, amount, fee_amount, timestamp);
+    bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
+    Request storage request = foreign_requests[src_chain_data_hash];
     require( request.status == RequestStatus.Released, "Invalid status" );
-    require( dest_chain_id == chainId, "Incorrect destination network" );
-    require( data_hash == _get_data_hash(request_id, to, src_chain_id, dest_chain_id, amount, fee_amount, deposit_tx_hash), "Incorrect deposit hash");
+    require( data_hash == request.data_hash, "Incorrect deposit tx hash" );
     
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
@@ -237,7 +245,7 @@ contract WjaxBscBridge {
     uint dest_chain_id,
     uint amount,
     uint fee_amount,
-    string memory deposit_tx_hash
+    uint timestamp
   ) pure public returns (bytes32) {
     return keccak256(abi.encodePacked(
       request_id,
@@ -246,7 +254,7 @@ contract WjaxBscBridge {
       dest_chain_id,
       amount,
       fee_amount,
-      deposit_tx_hash
+      timestamp
     ));
   }
 
