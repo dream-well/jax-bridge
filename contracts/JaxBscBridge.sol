@@ -60,7 +60,7 @@ contract JaxBscBridge {
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
 
-  event Create_Request(uint request_id, uint shard_id, uint amount, string from, uint depoist_address_id, uint valid_until);
+  event Create_Request(uint request_id, uint shard_id, string from, uint depoist_address_id, uint valid_until);
   event Prove_Request(uint request_id, string tx_hash);
   event Expire_Request(uint request_id);
   event Reject_Request(uint request_id);
@@ -143,7 +143,7 @@ contract JaxBscBridge {
     deposit_address_locktimes[deposit_address_id] = valid_until;
     requests.push(request);
     user_requests[to].push(request_id);
-    emit Create_Request(request_id, shard_id, amount, from, deposit_address_id, valid_until);
+    emit Create_Request(request_id, shard_id, from, deposit_address_id, valid_until);
   }
 
   function prove_request(uint request_id, string memory tx_hash) external {
@@ -161,7 +161,6 @@ contract JaxBscBridge {
     request.txdHash = txdHash;
     request.status = RequestStatus.Proved;
     request.prove_timestamp = block.timestamp;
-    request.amount = 0;
     request.data_hash = _get_data_hash(
       request_id, 
       request.shard_id, 
@@ -170,6 +169,7 @@ contract JaxBscBridge {
       request.to, 
       request.from, 
       tx_hash);
+    request.amount = 0;
     emit Prove_Request(request_id, tx_hash);
   }
 
