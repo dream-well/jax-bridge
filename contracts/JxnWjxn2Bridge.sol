@@ -7,12 +7,12 @@ interface IERC20 {
   function transfer(address, uint) external;
 }
 
-contract JxnWjxn2Bridge {
+contract JaxBscBridge {
 
   uint chainId;
   
   uint public fee_percent = 5e5; // 0.5 %
-  uint public minimum_fee_amount = 50; // 50 WJXN2
+  uint public minimum_fee_amount = 50; // 50 wjxn2
 
   address public admin;
 
@@ -21,15 +21,15 @@ contract JxnWjxn2Bridge {
   address public penalty_wallet;  
   
   uint public max_pending_audit_records = 10;
-  uint public pending_audit_records;
-
+  uint public pending_audit_records;  
+    
   IERC20 public wjxn2 = IERC20(0xe3345c59ECd8B9C157Dd182BA9500aace899AD31);
-
 
   enum RequestStatus {Init, Proved, Rejected, Expired, Verified, Released, Completed}
 
   struct Request {
     uint deposit_address_id;
+    uint shard_id;
     uint amount;
     bytes32 txdHash;
     bytes32 data_hash;
@@ -44,9 +44,10 @@ contract JxnWjxn2Bridge {
   }
 
   string[] public deposit_addresses;
-  uint[] public deposit_address_locktimes;
-  mapping(uint => bool) public deposit_address_deleted;
   mapping(uint => uint) public deposit_address_requests;
+  mapping(string => bool) public added_deposit_addresses;
+  mapping(string => uint) public deposit_address_locktimes;
+  mapping(string => bool) public deposit_address_deleted;
 
   Request[] public requests;
 
@@ -60,7 +61,7 @@ contract JxnWjxn2Bridge {
 
   mapping(bytes32 => bool) proccessed_txd_hashes;
 
-  event Create_Request(uint request_id, string from, uint depoist_address_id, uint valid_until);
+  event Create_Request(uint request_id, uint shard_id, string from, uint depoist_address_id, uint valid_until);
   event Prove_Request(uint request_id, string tx_hash);
   event Expire_Request(uint request_id);
   event Reject_Request(uint request_id);
@@ -103,48 +104,51 @@ contract JxnWjxn2Bridge {
     _;
   }
 
-  modifier isValidDepositAddress(uint deposit_address_id) {
-    require(deposit_address_deleted[deposit_address_id] == false, "Deposit address deleted");
-    _;
-  }
-
   function add_deposit_addresses(string[] calldata new_addresses) external onlyAdmin {
     for(uint i = 0; i < new_addresses.length; i += 1) {
+      require(!added_deposit_addresses[new_addresses[i]], "Already added");
       deposit_addresses.push(new_addresses[i]);
-      deposit_address_locktimes.push(0);
+      deposit_address_locktimes[new_addresses[i]] = 0;
+      added_deposit_addresses[new_addresses[i]] = true;
     }
   }
 
-  function get_free_deposit_address_id() external view returns(uint) {
-    for(uint i = 0; i < deposit_address_locktimes.length; i += 1) {
-      if(deposit_address_deleted[i] == false && deposit_address_locktimes[i] == 0) return i;
+  function get_free_deposit_address_id() public view returns(uint) {
+    for(uint i = 0; i < deposit_addresses.length; i += 1) {
+      if(deposit_address_deleted[deposit_addresses[i]] == false && deposit_address_locktimes[deposit_addresses[i]] == 0) 
+        return i;
     }
     revert("All deposit addresses are in use");
   }
 
-  function create_request(uint amount, uint deposit_address_id, address to, string memory from) external 
-    isValidDepositAddress(deposit_address_id)
+  function isValidDepositAddress(uint deposit_address_id) internal view returns(bool) {
+    return deposit_addresses.length > deposit_address_id &&
+      !deposit_address_deleted[deposit_addresses[deposit_address_id]] &&
+      deposit_address_locktimes[deposit_addresses[deposit_address_id]] == 0;
+  }
+
+  function create_request(uint shard_id, uint deposit_address_id, uint amount, string memory from) external 
   {
-    require(to == msg.sender, "destination address should be sender");
+    require(shard_id >= 1 && shard_id <= 3, "Invalid shard id");
+    require(isValidDepositAddress(deposit_address_id), "Invalid deposit address");
     require(amount > minimum_fee_amount, "Below minimum amount");
     uint request_id = requests.length;
     Request memory request;
+    request.shard_id = shard_id;
     request.amount = amount;
-    request.to = to;
+    request.to = msg.sender;
     request.from = from;
-    require(deposit_address_locktimes.length > deposit_address_id, "deposit_address_id out of index");
-    require(deposit_address_locktimes[deposit_address_id] == 0, "Deposit address is in use");
     request.deposit_address_id = deposit_address_id;
-    deposit_address_requests[deposit_address_id] = request_id;
+    deposit_address_requests[request.deposit_address_id] = request_id;
     uint valid_until = block.timestamp + 48 hours;
     request.valid_until = valid_until;
-    deposit_address_locktimes[deposit_address_id] = valid_until;
+    deposit_address_locktimes[deposit_addresses[request.deposit_address_id]] = valid_until;
     requests.push(request);
-    user_requests[to].push(request_id);
-    emit Create_Request(request_id, from, deposit_address_id, valid_until);
+    user_requests[msg.sender].push(request_id);
+    emit Create_Request(request_id, shard_id, from, request.deposit_address_id, valid_until);
   }
 
-  function prove_request(uint request_id, string memory deposit_tx_hash) external {
+  function prove_request(uint request_id, string memory tx_hash) external {
     Request storage request = requests[request_id];
     require(request.to == msg.sender, "Invalid account");
     require(request.status == RequestStatus.Init, "Invalid status");
@@ -154,24 +158,26 @@ contract JxnWjxn2Bridge {
       emit Expire_Request(request_id);
       return;
     }
-    bytes32 txdHash = keccak256(abi.encodePacked(deposit_tx_hash));
+    bytes32 txdHash = keccak256(abi.encodePacked(tx_hash));
     require(proccessed_txd_hashes[txdHash] == false, "Invalid tx hash");
     request.txdHash = txdHash;
     request.status = RequestStatus.Proved;
     request.prove_timestamp = block.timestamp;
     request.data_hash = _get_data_hash(
       request_id, 
+      request.shard_id, 
       request.deposit_address_id, 
       request.amount, 
       request.to, 
       request.from, 
-      deposit_tx_hash);
+      tx_hash);
     request.amount = 0;
-    emit Prove_Request(request_id, deposit_tx_hash);
+    emit Prove_Request(request_id, tx_hash);
   }
 
   function _get_data_hash(
     uint request_id, 
+    uint shard_id,
     uint deposit_address_id,
     uint amount,
     address to,
@@ -180,6 +186,7 @@ contract JxnWjxn2Bridge {
   ) pure public returns (bytes32) {
     return keccak256(abi.encodePacked(
       request_id, 
+      shard_id,
       deposit_address_id,
       amount,
       to,
@@ -190,6 +197,7 @@ contract JxnWjxn2Bridge {
 
   function verify_data_hash(
     uint request_id,
+    uint shard_id, 
     uint amount, 
     uint deposit_address_id, 
     address to, 
@@ -200,13 +208,13 @@ contract JxnWjxn2Bridge {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Proved, "Invalid status");
     require(data_hash == request.data_hash && request.data_hash == _get_data_hash(
-      request_id,  
+      request_id, 
+      shard_id, 
       deposit_address_id, 
       amount, 
       to, 
       from, 
       deposit_tx_hash), "Incorrect data");
-    require(bytes(request.deposit_tx_hash).length == 0, "");
     request.deposit_tx_hash = deposit_tx_hash;
     request.status = RequestStatus.Verified;
     emit Verify_Data_Hash(request_id, deposit_tx_hash);
@@ -221,6 +229,7 @@ contract JxnWjxn2Bridge {
 
   function release(
     uint request_id,
+    uint shard_id, 
     uint amount, 
     uint deposit_address_id, 
     address to, 
@@ -232,6 +241,7 @@ contract JxnWjxn2Bridge {
     require(request.status == RequestStatus.Verified, "Invalid status");
     require(request.data_hash == _get_data_hash(
       request_id, 
+      shard_id, 
       deposit_address_id, 
       amount, 
       to, 
@@ -240,7 +250,7 @@ contract JxnWjxn2Bridge {
     require(proccessed_txd_hashes[request.txdHash] == false, "Txd hash already processed");
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
-    deposit_address_locktimes[request.deposit_address_id] = 0;
+    deposit_address_locktimes[deposit_addresses[request.deposit_address_id]] = 0;
     request.amount = amount;
     request.status = RequestStatus.Released;
     proccessed_txd_hashes[request.txdHash] = true;
@@ -267,7 +277,8 @@ contract JxnWjxn2Bridge {
   }
 
   function complete_release_tx_link(
-    uint request_id, 
+    uint request_id,
+    uint shard_id, 
     uint amount, 
     uint deposit_address_id, 
     address to, 
@@ -281,6 +292,7 @@ contract JxnWjxn2Bridge {
     require(request.status == RequestStatus.Released, "Invalid status");
     require(request.data_hash == _get_data_hash(
       request_id, 
+      shard_id, 
       deposit_address_id, 
       amount, 
       to, 
@@ -292,7 +304,6 @@ contract JxnWjxn2Bridge {
     pending_audit_records -= 1;
     emit Complete_Release_Tx_Link(request_id, deposit_tx_link, release_tx_link, info_hash);
   }
-
 
   function update_release_tx_link(uint request_id, string memory deposit_tx_link, string memory release_tx_link) external onlyAdmin {
     Request storage request = requests[request_id];
@@ -394,12 +405,12 @@ contract JxnWjxn2Bridge {
 
   function free_deposit_addresses(uint from, uint to) external onlyAdmin  {
     uint request_id;
-    for(uint i = from; i < deposit_address_locktimes.length && i <= to ; i += 1) {
-      if(deposit_address_locktimes[i] < block.timestamp) {
+    for(uint i = from; i < deposit_addresses.length && i <= to ; i += 1) {
+      if(deposit_address_locktimes[deposit_addresses[i]] < block.timestamp) {
         request_id = deposit_address_requests[i];
         if(requests[request_id].status == RequestStatus.Init){
           requests[request_id].status = RequestStatus.Expired;
-          deposit_address_locktimes[i] = 0;
+          deposit_address_locktimes[deposit_addresses[i]] = 0;
         }
       }
     }
@@ -409,8 +420,8 @@ contract JxnWjxn2Bridge {
     uint id;
     for(uint i = 0; i < ids.length; i += 1) {
       id = ids[i];
-      require(deposit_address_locktimes[id] == 0, "Active deposit address");
-      deposit_address_deleted[id] = true;
+      require(deposit_address_locktimes[deposit_addresses[id]] == 0, "Active deposit address");
+      deposit_address_deleted[deposit_addresses[id]] = true;
     }
   }
 
