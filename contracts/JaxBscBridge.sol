@@ -44,9 +44,10 @@ contract JaxBscBridge {
   }
 
   string[] public deposit_addresses;
-  uint[] public deposit_address_locktimes;
-  mapping(uint => bool) public deposit_address_deleted;
   mapping(uint => uint) public deposit_address_requests;
+  mapping(string => bool) public added_deposit_addresses;
+  mapping(string => uint) public deposit_address_locktimes;
+  mapping(string => bool) public deposit_address_deleted;
 
   Request[] public requests;
 
@@ -103,47 +104,40 @@ contract JaxBscBridge {
     _;
   }
 
-  modifier isValidDepositAddress(uint deposit_address_id) {
-    require(deposit_address_deleted[deposit_address_id] == false, "Deposit address deleted");
-    _;
-  }
-
   function add_deposit_addresses(string[] calldata new_addresses) external onlyAdmin {
     for(uint i = 0; i < new_addresses.length; i += 1) {
+      require(!added_deposit_addresses[new_addresses[i]], "Already added");
       deposit_addresses.push(new_addresses[i]);
-      deposit_address_locktimes.push(0);
+      deposit_address_locktimes[new_addresses[i]] = 0;
+      added_deposit_addresses[new_addresses[i]] = true;
     }
   }
 
-  function get_free_deposit_address_id() external view returns(uint) {
-    for(uint i = 0; i < deposit_address_locktimes.length; i += 1) {
-      if(deposit_address_deleted[i] == false && deposit_address_locktimes[i] == 0) return i;
+  function get_free_deposit_address_id() public view returns(uint) {
+    for(uint i = 0; i < deposit_addresses.length; i += 1) {
+      if(deposit_address_deleted[deposit_addresses[i]] == false && deposit_address_locktimes[deposit_addresses[i]] == 0) return i;
     }
     revert("All deposit addresses are in use");
   }
 
-  function create_request(uint shard_id, uint amount, uint deposit_address_id, address to, string memory from) external 
-    isValidDepositAddress(deposit_address_id)
+  function create_request(uint shard_id, uint amount, string memory from) external 
   {
-    require(to == msg.sender, "destination address should be sender");
     require(shard_id >= 1 && shard_id <= 3, "Invalid shard id");
     require(amount > minimum_fee_amount, "Below minimum amount");
     uint request_id = requests.length;
     Request memory request;
     request.shard_id = shard_id;
     request.amount = amount;
-    request.to = to;
+    request.to = msg.sender;
     request.from = from;
-    require(deposit_address_locktimes.length > deposit_address_id, "deposit_address_id out of index");
-    require(deposit_address_locktimes[deposit_address_id] == 0, "Deposit address is in use");
-    request.deposit_address_id = deposit_address_id;
-    deposit_address_requests[deposit_address_id] = request_id;
+    request.deposit_address_id = get_free_deposit_address_id();
+    deposit_address_requests[request.deposit_address_id] = request_id;
     uint valid_until = block.timestamp + 48 hours;
     request.valid_until = valid_until;
-    deposit_address_locktimes[deposit_address_id] = valid_until;
+    deposit_address_locktimes[deposit_addresses[request.deposit_address_id]] = valid_until;
     requests.push(request);
-    user_requests[to].push(request_id);
-    emit Create_Request(request_id, shard_id, from, deposit_address_id, valid_until);
+    user_requests[msg.sender].push(request_id);
+    emit Create_Request(request_id, shard_id, from, request.deposit_address_id, valid_until);
   }
 
   function prove_request(uint request_id, string memory tx_hash) external {
@@ -248,7 +242,7 @@ contract JaxBscBridge {
     require(proccessed_txd_hashes[request.txdHash] == false, "Txd hash already processed");
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
-    deposit_address_locktimes[request.deposit_address_id] = 0;
+    deposit_address_locktimes[deposit_addresses[request.deposit_address_id]] = 0;
     request.amount = amount;
     request.status = RequestStatus.Released;
     proccessed_txd_hashes[request.txdHash] = true;
@@ -403,12 +397,12 @@ contract JaxBscBridge {
 
   function free_deposit_addresses(uint from, uint to) external onlyAdmin  {
     uint request_id;
-    for(uint i = from; i < deposit_address_locktimes.length && i <= to ; i += 1) {
-      if(deposit_address_locktimes[i] < block.timestamp) {
+    for(uint i = from; i < deposit_addresses.length && i <= to ; i += 1) {
+      if(deposit_address_locktimes[deposit_addresses[i]] < block.timestamp) {
         request_id = deposit_address_requests[i];
         if(requests[request_id].status == RequestStatus.Init){
           requests[request_id].status = RequestStatus.Expired;
-          deposit_address_locktimes[i] = 0;
+          deposit_address_locktimes[deposit_addresses[i]] = 0;
         }
       }
     }
@@ -418,8 +412,8 @@ contract JaxBscBridge {
     uint id;
     for(uint i = 0; i < ids.length; i += 1) {
       id = ids[i];
-      require(deposit_address_locktimes[id] == 0, "Active deposit address");
-      deposit_address_deleted[id] = true;
+      require(deposit_address_locktimes[deposit_addresses[id]] == 0, "Active deposit address");
+      deposit_address_deleted[deposit_addresses[id]] = true;
     }
   }
 
