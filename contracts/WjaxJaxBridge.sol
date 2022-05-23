@@ -147,10 +147,13 @@ contract WjaxJaxBridge {
     bytes32 data_hash
   ) external onlyVerifier {
     Request storage request = requests[request_id];
-    require( request.status == RequestStatus.Init, "Invalid status" );
-    require( data_hash == _get_data_hash(request_id, shard_id, amount, from, to, deposit_tx_hash), "Incorrect deposit hash");
+    require( request.status == RequestStatus.Init, "Invalid status");
+    require( data_hash == _get_data_hash(request_id, shard_id, amount, from, to, deposit_tx_hash), "Incorrect data hash");
+    request.data_hash = _get_data_hash(request_id, request.shard_id, request.amount, request.from, request.to, deposit_tx_hash);
+    require( data_hash == request.data_hash, "Invalid data hash");
+    bytes32 txDHash = keccak256(abi.encodePacked(deposit_tx_hash));
+    require( !proccessed_txd_hashes[txDHash], "Invalid deposit tx hash");
     request.deposit_tx_hash = deposit_tx_hash;
-    request.data_hash = data_hash;
     request.status = RequestStatus.Verified;
     emit Verify_Data_Hash(request_id, deposit_tx_hash);
   }

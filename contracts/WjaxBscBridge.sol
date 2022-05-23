@@ -146,6 +146,8 @@ contract WjaxBscBridge {
   ) external onlyVerifier {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     require( src_chain_data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, timestamp), "Incorrect data hash");
+    bytes32 txDHash = keccak256(abi.encodePacked(deposit_tx_hash));
+    require( !proccessed_txd_hashes[txDHash], "Invalid deposit tx hash");
     bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
     Request memory request = Request({
       src_chain_id: chainId,
@@ -181,6 +183,7 @@ contract WjaxBscBridge {
     bytes32 txDHash = keccak256(abi.encodePacked(deposit_tx_hash));
     Request storage request = foreign_requests[src_chain_data_hash];
     require( request.status == RequestStatus.Verified, "Invalid status" );
+    require( data_hash == request.data_hash, "Datahash mismatch" );
     require(operating_limits[msg.sender] >= amount, "Out of operating limit");
     require(max_pending_audit_records > pending_audit_records, "Exceed maximum pending audit records");
     pending_audit_records += 1;
@@ -222,7 +225,7 @@ contract WjaxBscBridge {
     bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
     Request storage request = foreign_requests[src_chain_data_hash];
     require( request.status == RequestStatus.Released, "Invalid status" );
-    require( data_hash == request.data_hash, "Incorrect deposit tx hash" );
+    require( data_hash == request.data_hash, "Datahash mismatch" );
     
     request.deposit_tx_link = deposit_tx_link;
     request.release_tx_link = release_tx_link;
