@@ -121,9 +121,16 @@ contract JaxBscBridge {
     revert("All deposit addresses are in use");
   }
 
+  function isValidDepositAddress(uint deposit_address_id) internal view returns(bool) {
+    return deposit_addresses.length > deposit_address_id &&
+      !deposit_address_deleted[deposit_addresses[deposit_address_id]] &&
+      deposit_address_locktimes[deposit_addresses[deposit_address_id]] == 0;
+  }
+
   function create_request(uint shard_id, uint deposit_address_id, uint amount, string memory from) external 
   {
     require(shard_id >= 1 && shard_id <= 3, "Invalid shard id");
+    require(isValidDepositAddress(deposit_address_id), "Invalid deposit address");
     require(amount > minimum_fee_amount, "Below minimum amount");
     uint request_id = requests.length;
     Request memory request;
