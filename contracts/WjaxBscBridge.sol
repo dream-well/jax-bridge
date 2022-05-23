@@ -11,9 +11,6 @@ contract WjaxBscBridge {
 
   uint chainId;
   
-  uint public fee_percent = 5e5; // 0.5 %
-  uint public minimum_fee_amount = 50 * 1e4; // 50 wjax
-
   address public admin;
 
   uint public penalty_amount = 0;
@@ -24,6 +21,10 @@ contract WjaxBscBridge {
   uint public pending_audit_records;
 
   IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
+
+  mapping(uint => uint) public fee_percent; // 8 decimals
+  mapping(uint => uint) public minimum_fee_amount; 
+
 
   enum RequestStatus {Init, Proved, Verified, Released, Completed}
 
@@ -107,11 +108,11 @@ contract WjaxBscBridge {
   }
 
   function deposit(uint dest_chain_id, uint amount) external {
-    require(amount >= minimum_fee_amount, "Minimum amount");
+    require(amount >= minimum_fee_amount[dest_chain_id], "Minimum amount");
     require(chainId != dest_chain_id, "Invalid Destnation network");
     uint request_id = requests.length;
-    uint fee_amount = amount * fee_percent / 1e8;
-    if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
+    uint fee_amount = amount * fee_percent[dest_chain_id] / 1e8;
+    if(fee_amount < minimum_fee_amount[dest_chain_id]) fee_amount = minimum_fee_amount[dest_chain_id];
     bytes32 src_chain_data_hash = _get_data_hash(request_id, msg.sender, chainId, dest_chain_id, amount, fee_amount, block.timestamp);
     Request memory request = Request({
       src_chain_id: chainId,
@@ -342,9 +343,9 @@ contract WjaxBscBridge {
     operating_limits[executor] = operating_limit;
   }
 
-  function set_fee(uint _fee_percent, uint _minimum_fee_amount) external onlyAdmin {
-    fee_percent = _fee_percent;
-    minimum_fee_amount = _minimum_fee_amount;
+  function set_fee(uint dest_chain_id, uint _fee_percent, uint _minimum_fee_amount) external onlyAdmin {
+    fee_percent[dest_chain_id] = _fee_percent;
+    minimum_fee_amount[dest_chain_id] = _minimum_fee_amount;
     emit Set_Fee(_fee_percent, _minimum_fee_amount);
   }
 
