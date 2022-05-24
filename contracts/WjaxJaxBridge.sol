@@ -105,7 +105,7 @@ contract WjaxJaxBridge {
     uint request_id = requests.length;
     Request memory request;
     request.shard_id = shard_id;
-    uint fee_amount = request.amount * fee_percent / 1e8;
+    uint fee_amount = amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
     request.amount = amount - fee_amount;
     request.fee_amount = fee_amount;

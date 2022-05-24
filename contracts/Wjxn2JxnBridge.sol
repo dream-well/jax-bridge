@@ -102,7 +102,7 @@ contract Wjxn2JxnBridge {
     require(amount > minimum_fee_amount, "Below minimum amount");
     uint request_id = requests.length;
     Request memory request;
-    uint fee_amount = request.amount * fee_percent / 1e8;
+    uint fee_amount = amount * fee_percent / 1e8;
     if(fee_amount < minimum_fee_amount) fee_amount = minimum_fee_amount;
     request.amount = amount - fee_amount;
     request.fee_amount = fee_amount;
