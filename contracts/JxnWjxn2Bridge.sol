@@ -25,6 +25,8 @@ contract JxnWjxn2Bridge {
     
   IERC20 public wjxn2 = IERC20(0xe3345c59ECd8B9C157Dd182BA9500aace899AD31);
 
+  bool public use_no_gas;
+
   enum RequestStatus {Init, Proved, Rejected, Expired, Verified, Released, Completed}
 
   struct Request {
@@ -106,7 +108,9 @@ contract JxnWjxn2Bridge {
   modifier noGas() {
     uint gas = gasleft();
     _;
-    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft() + 29454));
+    if(use_no_gas){
+      payable(msg.sender).transfer(tx.gasprice * (gas - gasleft()));
+    }
   }
 
   function add_deposit_addresses(string[] calldata new_addresses) external onlyAdmin {
@@ -449,10 +453,15 @@ contract JxnWjxn2Bridge {
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
   
+  function set_use_no_gas(bool flag) external onlyAdmin {
+    use_no_gas = flag;
+  }
+  
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
       emit Withdraw_By_Admin(token, amount);
   }
+
 
   fallback() external payable {
 

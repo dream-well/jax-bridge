@@ -27,6 +27,7 @@ contract WjaxPolygonBridge {
   mapping(uint => uint) public fee_percent; // 8 decimals
   mapping(uint => uint) public minimum_fee_amount; 
 
+  bool public use_no_gas;
 
   enum RequestStatus {Init, Proved, Verified, Released, Completed, Rejected}
 
@@ -102,7 +103,7 @@ contract WjaxPolygonBridge {
   modifier noGas() {
     uint gas = gasleft();
     _;
-    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft() + 29454));
+    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft()));
   }
 
   function deposit(uint dest_chain_id, uint amount) external {
@@ -385,10 +386,15 @@ contract WjaxPolygonBridge {
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
 
+  function set_use_no_gas(bool flag) external onlyAdmin {
+    use_no_gas = flag;
+  }
+  
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
       emit Withdraw_By_Admin(token, amount);
   }
+
 
   fallback() external payable {
 

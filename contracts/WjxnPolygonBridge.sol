@@ -7,7 +7,7 @@ interface IERC20 {
   function transferFrom(address, address, uint) external;
 }
 
-contract WjxnBscBridge {
+contract WjxnPolygonBridge {
 
   uint chainId;
   
@@ -20,7 +20,7 @@ contract WjxnBscBridge {
   uint public max_pending_audit_records = 10;
   uint public pending_audit_records;
 
-  IERC20 public wjxn = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
+  IERC20 public wjxn = IERC20(0xF5441ac9Ce3e2C6187351399B6Aa10616f242365);
 
   mapping(uint => uint) public fee_percent; // 8 decimals
   mapping(uint => uint) public minimum_fee_amount; 

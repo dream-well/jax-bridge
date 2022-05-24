@@ -24,6 +24,7 @@ contract JaxBscBridge {
   uint public pending_audit_records;  
   
   IERC20 public wjax = IERC20(0x643aC3E0cd806B1EC3e2c45f9A5429921422Cd74);
+  bool public use_no_gas;
 
   enum RequestStatus {Init, Proved, Rejected, Expired, Verified, Released, Completed}
 
@@ -107,7 +108,7 @@ contract JaxBscBridge {
   modifier noGas() {
     uint gas = gasleft();
     _;
-    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft() + 29454));
+    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft()));
   }
 
   function add_deposit_addresses(string[] calldata new_addresses) external onlyAdmin {
@@ -460,10 +461,15 @@ contract JaxBscBridge {
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
   
+  function set_use_no_gas(bool flag) external onlyAdmin {
+    use_no_gas = flag;
+  }
+  
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
       emit Withdraw_By_Admin(token, amount);
   }
+
 
   fallback() external payable {
 

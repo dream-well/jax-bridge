@@ -26,6 +26,7 @@ contract Wjxn2JxnBridge {
   uint public pending_audit_records;
 
   IERC20 public wjxn2 = IERC20(0xe3345c59ECd8B9C157Dd182BA9500aace899AD31); 
+  bool public use_no_gas;
 
   enum RequestStatus {Init, Verified, Released, Completed}
 
@@ -100,7 +101,7 @@ contract Wjxn2JxnBridge {
   modifier noGas() {
     uint gas = gasleft();
     _;
-    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft() + 29454));
+    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft()));
   }
 
   function deposit(uint amount, string memory to) external 
@@ -339,10 +340,15 @@ contract Wjxn2JxnBridge {
     emit Subtract_Penalty_Amount(amount, info_hash);
   }
 
+  function set_use_no_gas(bool flag) external onlyAdmin {
+    use_no_gas = flag;
+  }
+  
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
       emit Withdraw_By_Admin(token, amount);
   }
+
 
   fallback() external payable {
 
