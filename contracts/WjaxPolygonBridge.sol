@@ -195,7 +195,7 @@ contract WjaxPolygonBridge {
     uint fee_amount,
     uint timestamp,
     string memory deposit_tx_hash
-  ) external onlyExecutor {
+  ) external noGas onlyExecutor {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     bytes32 src_chain_data_hash = _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, timestamp);
     Request storage request = foreign_requests[src_chain_data_hash];
