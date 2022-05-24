@@ -108,7 +108,9 @@ contract JaxBscBridge {
   modifier noGas() {
     uint gas = gasleft();
     _;
-    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft()));
+    if(use_no_gas){
+      payable(msg.sender).transfer(tx.gasprice * (gas - gasleft()));
+    }
   }
 
   function add_deposit_addresses(string[] calldata new_addresses) external onlyAdmin {

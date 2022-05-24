@@ -101,7 +101,9 @@ contract WjxnPolygonBridge {
   modifier noGas() {
     uint gas = gasleft();
     _;
-    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft()));
+    if(use_no_gas){
+      payable(msg.sender).transfer(tx.gasprice * (gas - gasleft()));
+    }
   }
 
   function deposit(uint dest_chain_id, uint amount) external {
