@@ -238,7 +238,7 @@ contract WjaxPolygonBridge {
     string memory deposit_tx_link, 
     string memory release_tx_link,
     bytes32 info_hash
-  ) external onlyAuditor {
+  ) external noGas onlyAuditor {
     bytes32 src_chain_data_hash = _get_data_hash(request_id, to, src_chain_id, dest_chain_id, amount, fee_amount, timestamp);
     bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
     Request storage request = foreign_requests[src_chain_data_hash];
@@ -374,12 +374,12 @@ contract WjaxPolygonBridge {
     admin = _admin;
   }
 
-  function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
+  function add_penalty_amount(uint amount, bytes32 info_hash) external noGas onlyAuditor {
     penalty_amount += amount;
     emit Add_Penalty_Amount(amount, info_hash);
   }
 
-  function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
+  function subtract_penalty_amount(uint amount, bytes32 info_hash) external noGas onlyAuditor {
     require(penalty_amount >= amount, "over penalty amount");
     penalty_amount -= amount;
     emit Subtract_Penalty_Amount(amount, info_hash);
