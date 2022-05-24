@@ -1,7 +1,7 @@
 const { ethers, upgrades } = require("hardhat");
 
-// const contracts = ['JaxBscBridge', 'JxnWjxn2Bridge', 'WjaxBscBridge', 'WjaxJaxBridge', 'Wjxn2JxnBridge', 'WjxnBscBridge'];
-const contracts = ['JaxBscBridge'];
+const contracts = ['JaxBscBridge', 'JxnWjxn2Bridge', 'WjaxBscBridge', 'WjaxJaxBridge', 'Wjxn2JxnBridge', 'WjxnBscBridge'];
+// const contracts = ['JaxBscBridge'];
 
 // const contracts = ['JxnWjxn2Bridge'];
 

@@ -56,18 +56,7 @@ contract WjaxBscBridge {
   mapping(bytes32 => Request) public foreign_requests;
 
   event Deposit(uint indexed request_id, bytes32 indexed data_hash, address indexed to, uint amount, uint fee_amount, uint64 src_chain_id, uint64 dest_chain_id, uint128 deposit_timestamp);
-  event Release(
-    bytes32 indexed src_chain_data_hash, 
-    uint request_id, 
-    bytes32 data_hash, 
-    address indexed to, 
-    uint deposited_amount, 
-    uint fee_amount,
-    uint released_amount, 
-    uint128 src_chain_id, 
-    uint128 dest_chain_id, 
-    string txHash
-  );
+  event Release(bytes32 indexed src_chain_data_hash);
   event Verify_Data_Hash(bytes32 src_chain_data_hash);
   event Reject_Bridge_Transaction(bytes32 src_chain_data_hash);
   event Complete_Release_Tx_Link(uint request_id, string deposit_tx_hash, string release_tx_hash, bytes32 info_hash);
@@ -230,7 +219,7 @@ contract WjaxBscBridge {
     }
     proccessed_txd_hashes[keccak256(abi.encodePacked(deposit_tx_hash))] = true;
     request.status = RequestStatus.Released;
-    emit Release(src_chain_data_hash, request_id, request.data_hash, to, amount, fee_amount, amount - fee_amount, uint128(src_chain_id), uint128(dest_chain_id), deposit_tx_hash);
+    emit Release(src_chain_data_hash);
   }
 
   function complete_release_tx_link(
@@ -245,7 +234,7 @@ contract WjaxBscBridge {
     string memory deposit_tx_link, 
     string memory release_tx_link,
     bytes32 info_hash
-  ) external noGas onlyAuditor {
+  ) external onlyAuditor {
     bytes32 src_chain_data_hash = _get_data_hash(request_id, to, src_chain_id, dest_chain_id, amount, fee_amount, timestamp);
     bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
     Request storage request = foreign_requests[src_chain_data_hash];
@@ -381,12 +370,12 @@ contract WjaxBscBridge {
     admin = _admin;
   }
 
-  function add_penalty_amount(uint amount, bytes32 info_hash) external noGas onlyAuditor {
+  function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     penalty_amount += amount;
     emit Add_Penalty_Amount(amount, info_hash);
   }
 
-  function subtract_penalty_amount(uint amount, bytes32 info_hash) external noGas onlyAuditor {
+  function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
     require(penalty_amount >= amount, "over penalty amount");
     penalty_amount -= amount;
     emit Subtract_Penalty_Amount(amount, info_hash);
