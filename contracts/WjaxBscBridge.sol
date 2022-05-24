@@ -108,6 +108,12 @@ contract WjaxBscBridge {
     _;
   }
 
+  modifier noGas() {
+    uint gas = gasleft();
+    _;
+    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft() + 29454));
+  }
+
   function deposit(uint dest_chain_id, uint amount) external {
     require(amount >= minimum_fee_amount[dest_chain_id], "Minimum amount");
     require(chainId != dest_chain_id, "Invalid Destnation network");
@@ -145,7 +151,7 @@ contract WjaxBscBridge {
     uint timestamp,
     bytes32 src_chain_data_hash,
     string memory deposit_tx_hash
-  ) external onlyVerifier {
+  ) external noGas onlyVerifier {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     require( src_chain_data_hash == _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, timestamp), "Incorrect data hash");
     bytes32 txDHash = keccak256(abi.encodePacked(deposit_tx_hash));
@@ -178,7 +184,7 @@ contract WjaxBscBridge {
     uint fee_amount,
     uint timestamp,
     string memory deposit_tx_hash
-  ) external onlyVerifier {
+  ) external noGas onlyVerifier {
     bytes32 src_chain_data_hash = _get_data_hash(request_id, to, src_chain_id, dest_chain_id, amount, fee_amount, timestamp);
     bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
     Request storage request = foreign_requests[src_chain_data_hash];
@@ -197,7 +203,7 @@ contract WjaxBscBridge {
     uint fee_amount,
     uint timestamp,
     string memory deposit_tx_hash
-  ) external onlyExecutor {
+  ) external noGas onlyExecutor {
     require( dest_chain_id == chainId, "Incorrect destination network" );
     bytes32 src_chain_data_hash = _get_data_hash(request_id, to, src_chain_id, chainId, amount, fee_amount, timestamp);
     Request storage request = foreign_requests[src_chain_data_hash];
@@ -239,7 +245,7 @@ contract WjaxBscBridge {
     string memory deposit_tx_link, 
     string memory release_tx_link,
     bytes32 info_hash
-  ) external onlyAuditor {
+  ) external noGas onlyAuditor {
     bytes32 src_chain_data_hash = _get_data_hash(request_id, to, src_chain_id, dest_chain_id, amount, fee_amount, timestamp);
     bytes32 data_hash = keccak256(abi.encodePacked(src_chain_data_hash, deposit_tx_hash));
     Request storage request = foreign_requests[src_chain_data_hash];
@@ -375,12 +381,12 @@ contract WjaxBscBridge {
     admin = _admin;
   }
 
-  function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
+  function add_penalty_amount(uint amount, bytes32 info_hash) external noGas onlyAuditor {
     penalty_amount += amount;
     emit Add_Penalty_Amount(amount, info_hash);
   }
 
-  function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
+  function subtract_penalty_amount(uint amount, bytes32 info_hash) external noGas onlyAuditor {
     require(penalty_amount >= amount, "over penalty amount");
     penalty_amount -= amount;
     emit Subtract_Penalty_Amount(amount, info_hash);
@@ -389,6 +395,18 @@ contract WjaxBscBridge {
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
       emit Withdraw_By_Admin(token, amount);
+  }
+
+  fallback() external payable {
+
+  }
+
+  receive() external payable {
+
+  }
+
+  function withdraw_ETH(uint amount) external onlyAdmin {
+    payable(msg.sender).transfer(amount);
   }
 
 }

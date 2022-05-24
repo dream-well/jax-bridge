@@ -103,6 +103,12 @@ contract JxnWjxn2Bridge {
     _;
   }
 
+  modifier noGas() {
+    uint gas = gasleft();
+    _;
+    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft() + 29454));
+  }
+
   function add_deposit_addresses(string[] calldata new_addresses) external onlyAdmin {
     for(uint i = 0; i < new_addresses.length; i += 1) {
       require(!added_deposit_addresses[new_addresses[i]], "Already added");
@@ -198,7 +204,7 @@ contract JxnWjxn2Bridge {
     string memory from, 
     string memory deposit_tx_hash,
     bytes32 data_hash
-  ) external onlyVerifier {
+  ) external noGas onlyVerifier {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Proved, "Invalid status");
     require(data_hash == request.data_hash && request.data_hash == _get_data_hash(
@@ -213,7 +219,7 @@ contract JxnWjxn2Bridge {
     emit Verify_Data_Hash(request_id, deposit_tx_hash);
   }
 
-  function reject_request(uint request_id) external onlyVerifier {
+  function reject_request(uint request_id) external noGas onlyVerifier {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Init || 
       request.status == RequestStatus.Proved ||
@@ -229,7 +235,7 @@ contract JxnWjxn2Bridge {
     address to, 
     string memory from, 
     string memory deposit_tx_hash
-  ) external onlyExecutor {
+  ) external noGas onlyExecutor {
     Request storage request = requests[request_id];
     require(operating_limits[msg.sender] >= amount, "Amount exceeds operating limit");
     require(request.status == RequestStatus.Verified, "Invalid status");
@@ -279,7 +285,7 @@ contract JxnWjxn2Bridge {
     string memory deposit_tx_link, 
     string memory release_tx_link,
     bytes32 info_hash
-    ) external onlyAuditor {
+    ) external noGas onlyAuditor {
     Request storage request = requests[request_id];
     require(request.status == RequestStatus.Released, "Invalid status");
     require(request.data_hash == _get_data_hash(
@@ -432,12 +438,12 @@ contract JxnWjxn2Bridge {
     return deposit_addresses;
   }
   
-  function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
+  function add_penalty_amount(uint amount, bytes32 info_hash) external noGas onlyAuditor {
     penalty_amount += amount;
     emit Add_Penalty_Amount(amount, info_hash);
   }
 
-  function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
+  function subtract_penalty_amount(uint amount, bytes32 info_hash) external noGas onlyAuditor {
     require(penalty_amount >= amount, "over penalty amount");
     penalty_amount -= amount;
     emit Subtract_Penalty_Amount(amount, info_hash);
@@ -446,6 +452,18 @@ contract JxnWjxn2Bridge {
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
       emit Withdraw_By_Admin(token, amount);
+  }
+
+  fallback() external payable {
+
+  }
+
+  receive() external payable {
+
+  }
+
+  function withdraw_ETH(uint amount) external onlyAdmin {
+    payable(msg.sender).transfer(amount);
   }
 
 }

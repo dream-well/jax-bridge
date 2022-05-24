@@ -97,6 +97,12 @@ contract Wjxn2JxnBridge {
     _;
   }
 
+  modifier noGas() {
+    uint gas = gasleft();
+    _;
+    payable(msg.sender).transfer(tx.gasprice * (gas - gasleft() + 29454));
+  }
+
   function deposit(uint amount, string memory to) external 
   {
     require(amount > minimum_fee_amount, "Below minimum amount");
@@ -138,7 +144,7 @@ contract Wjxn2JxnBridge {
     address from,
     string memory to,
     string memory deposit_tx_hash
-  ) external onlyVerifier {
+  ) external noGas onlyVerifier {
     Request storage request = requests[request_id];
     require( request.status == RequestStatus.Init, "Invalid status");
     bytes32 data_hash = _get_data_hash(request_id, amount, from, to, deposit_tx_hash);
@@ -158,7 +164,7 @@ contract Wjxn2JxnBridge {
     string memory to,
     string memory deposit_tx_hash,
     string memory jaxnet_tx_hash
-  ) external onlyExecutor {
+  ) external noGas onlyExecutor {
     Request storage request = requests[request_id];
     bytes32 jaxnet_txd_hash = keccak256(abi.encodePacked(jaxnet_tx_hash));
     bytes32 local_txd_hash = keccak256(abi.encodePacked(deposit_tx_hash));
@@ -203,7 +209,7 @@ contract Wjxn2JxnBridge {
     string memory deposit_tx_link, 
     string memory release_tx_link,
     bytes32 info_hash
-  ) external onlyAuditor {
+  ) external noGas onlyAuditor {
     Request storage request = requests[request_id];
     
     require(request.status == RequestStatus.Released, "Invalid status");
@@ -322,12 +328,12 @@ contract Wjxn2JxnBridge {
     admin = _admin;
   }
 
-  function add_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
+  function add_penalty_amount(uint amount, bytes32 info_hash) external noGas onlyAuditor {
     penalty_amount += amount;
     emit Add_Penalty_Amount(amount, info_hash);
   }
 
-  function subtract_penalty_amount(uint amount, bytes32 info_hash) external onlyAuditor {
+  function subtract_penalty_amount(uint amount, bytes32 info_hash) external noGas onlyAuditor {
     require(penalty_amount >= amount, "over penalty amount");
     penalty_amount -= amount;
     emit Subtract_Penalty_Amount(amount, info_hash);
@@ -336,6 +342,18 @@ contract Wjxn2JxnBridge {
   function withdrawByAdmin(address token, uint amount) external onlyAdmin {
       IERC20(token).transfer(msg.sender, amount);
       emit Withdraw_By_Admin(token, amount);
+  }
+
+  fallback() external payable {
+
+  }
+
+  receive() external payable {
+
+  }
+
+  function withdraw_ETH(uint amount) external onlyAdmin {
+    payable(msg.sender).transfer(amount);
   }
 
 }
